@@ -32,7 +32,8 @@ lib/
 ├── main.dart                     # Provider 구성, 앱 시작
 ├── llm/                          # LLM 공급자 추상화 (도구 호출 지원)
 │   ├── llm_types.dart            #   공통 메시지/도구 타입
-│   ├── openai_provider.dart      #   Chat Completions + function calling
+│   ├── openai_provider.dart      #   Chat Completions + function calling (API 키)
+│   ├── chatgpt_codex_provider.dart #  ChatGPT 구독: Codex 백엔드 Responses API (SSE)
 │   ├── anthropic_provider.dart   #   Messages API + tool use
 │   └── gemini_provider.dart      #   generateContent + function calling
 ├── browser/
@@ -41,6 +42,8 @@ lib/
 │   ├── web_settings.dart         # 로그인용·에이전트용 웹뷰 공통 설정(UA, 쿠키)
 │   ├── sites.dart                # 웹 자동화 사이트 정의 (쿠팡) — 여기에 새 사이트 추가
 │   └── session_store.dart        # 사이트별 로그인 상태, 로그아웃(쿠키 삭제)
+├── openai/
+│   └── chatgpt_auth.dart         # ChatGPT 구독 로그인 (기기 코드 OAuth, 토큰 갱신)
 ├── google/
 │   ├── google_auth.dart          # Google 로그인 + Gmail 권한(access token) 관리
 │   └── gmail_api.dart            # Gmail REST: 검색, 읽기(HTML→텍스트), 전송(MIME, 답장 스레드)
@@ -85,9 +88,22 @@ flutter test           # LLM 요청 변환, 승인 강제, Gmail API 테스트
 > `gmail.readonly` / `gmail.send` 는 Google 의 **제한된(restricted) 범위**입니다. 테스트 모드(등록한 테스트 사용자)로는 바로 쓸 수 있지만,
 > 일반 사용자에게 공개하려면 Google 앱 인증(보안 평가 포함)을 받아야 합니다.
 
+### ChatGPT 구독(Plus/Pro)으로 쓰기
+
+API 키 대신 ChatGPT 구독 사용량으로 에이전트를 돌릴 수 있습니다. OpenClaw · Hermes Agent 와 같은 방식입니다.
+
+1. 설정 → **ChatGPT 구독 (Plus/Pro)** 선택 → **ChatGPT 계정으로 로그인**
+2. 표시된 코드를 **복사 후 열기** → Safari 에서 ChatGPT 로그인 → 코드 붙여넣기 → 승인
+3. 창이 자동으로 닫히면 완료. 토큰은 Keychain/Keystore 에 저장되고 자동 갱신됩니다.
+
+- 로그인 화면에는 "Codex"가 표시되고, Codex 계열 모델(기본 `gpt-5.5`)만 쓸 수 있습니다.
+- 앱은 Codex CLI 로 위장하지 않고 자체 `originator`(`ai_agent_flutter`)로 요청합니다.
+- 외부 앱용 공식 "ChatGPT 로그인"이 아직 없어 공개 문서가 없는 방식입니다. OpenAI 정책에 따라 바뀌거나 막힐 수 있습니다.
+- **Claude 구독(Pro/Max)은 지원하지 않습니다.** Anthropic 약관상 구독 토큰은 Claude.ai·Claude Code 전용이므로 Claude 는 API 키로 사용하세요.
+
 ### 사용 순서
 
-1. 앱 오른쪽 위 **설정**에서 사용할 LLM을 고르고 API 키를 입력합니다.
+1. 앱 오른쪽 위 **설정**에서 사용할 LLM을 고르고 API 키를 입력합니다 (또는 ChatGPT 계정으로 로그인).
    - 기본 모델: OpenAI `gpt-4.1`, Claude `claude-sonnet-5`, Gemini `gemini-2.5-flash` (설정에서 변경 가능)
 2. 홈에서 **쿠팡 로그인**(인앱 브라우저, 로그인되면 자동으로 닫힘)과 **Google 계정 연결**을 합니다.
 3. 할 일을 입력하고 **실행**을 누릅니다. 결제·전송 직전에 승인 카드가 뜹니다.

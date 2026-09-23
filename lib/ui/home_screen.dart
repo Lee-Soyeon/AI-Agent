@@ -7,6 +7,7 @@ import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
+import '../openai/chatgpt_auth.dart';
 import 'browser_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
@@ -87,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final sessions = context.watch<SiteSessionStore>();
     final agent = context.watch<AgentController>();
     final google = context.watch<GoogleAuthService>();
+    context.watch<ChatGptAuth>(); // ChatGPT 로그인 상태가 바뀌면 LLM 카드를 갱신
     final theme = Theme.of(context);
 
     return Scaffold(

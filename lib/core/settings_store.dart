@@ -3,25 +3,33 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../llm/anthropic_provider.dart';
+import '../llm/chatgpt_codex_provider.dart';
 import '../llm/gemini_provider.dart';
 import '../llm/llm_types.dart';
 import '../llm/openai_provider.dart';
+import '../openai/chatgpt_auth.dart';
 
 enum LlmVendor {
-  openai('OpenAI', 'gpt-4.1'),
+  openai('OpenAI API', 'gpt-4.1'),
+  chatgpt('ChatGPT 구독 (Plus/Pro)', 'gpt-5.5', usesApiKey: false),
   anthropic('Claude (Anthropic)', 'claude-sonnet-5'),
   gemini('Gemini (Google)', 'gemini-2.5-flash');
 
-  const LlmVendor(this.label, this.defaultModel);
+  const LlmVendor(this.label, this.defaultModel, {this.usesApiKey = true});
 
   final String label;
   final String defaultModel;
+
+  /// false 면 API 키 대신 계정 로그인으로 인증한다.
+  final bool usesApiKey;
 }
 
 /// API 키는 기기 보안 저장소(Keychain / Keystore)에, 나머지 설정은 SharedPreferences 에 저장한다.
 class SettingsStore extends ChangeNotifier {
-  SettingsStore({FlutterSecureStorage? secure}) : _secure = secure ?? const FlutterSecureStorage();
+  SettingsStore({required this.chatgpt, FlutterSecureStorage? secure})
+    : _secure = secure ?? const FlutterSecureStorage();
 
+  final ChatGptAuth chatgpt;
   final FlutterSecureStorage _secure;
 
   LlmVendor vendor = LlmVendor.anthropic;
@@ -50,7 +58,7 @@ class SettingsStore extends ChangeNotifier {
   String apiKey(LlmVendor v) => _apiKeys[v] ?? '';
   String model(LlmVendor v) => _models[v] ?? v.defaultModel;
 
-  bool get isConfigured => apiKey(vendor).isNotEmpty;
+  bool get isConfigured => vendor.usesApiKey ? apiKey(vendor).isNotEmpty : chatgpt.isSignedIn;
 
   Future<void> save({
     required LlmVendor vendor,
@@ -79,6 +87,7 @@ class SettingsStore extends ChangeNotifier {
     final m = model(vendor);
     return switch (vendor) {
       LlmVendor.openai => OpenAiProvider(apiKey: key, model: m),
+      LlmVendor.chatgpt => ChatGptCodexProvider(auth: chatgpt, model: m),
       LlmVendor.anthropic => AnthropicProvider(apiKey: key, model: m),
       LlmVendor.gemini => GeminiProvider(apiKey: key, model: m),
     };

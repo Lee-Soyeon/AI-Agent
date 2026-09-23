@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/settings_store.dart';
+import 'chatgpt_login.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -57,35 +58,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Text('사용할 LLM', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          SegmentedButton<LlmVendor>(
-            segments: const [
-              ButtonSegment(value: LlmVendor.openai, label: Text('OpenAI')),
-              ButtonSegment(value: LlmVendor.anthropic, label: Text('Claude')),
-              ButtonSegment(value: LlmVendor.gemini, label: Text('Gemini')),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final v in LlmVendor.values)
+                ChoiceChip(
+                  label: Text(v.label),
+                  selected: _vendor == v,
+                  onSelected: (_) => setState(() => _vendor = v),
+                ),
             ],
-            selected: {_vendor},
-            onSelectionChanged: (s) => setState(() => _vendor = s.first),
           ),
           const SizedBox(height: 24),
           for (final v in LlmVendor.values) ...[
             Text(v.label, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            TextField(
-              controller: _keys[v],
-              obscureText: !_revealed.contains(v),
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: 'API 키',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(
-                    () => _revealed.contains(v) ? _revealed.remove(v) : _revealed.add(v),
+            if (!v.usesApiKey)
+              const ChatGptAccountTile()
+            else
+              TextField(
+                controller: _keys[v],
+                obscureText: !_revealed.contains(v),
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: InputDecoration(
+                  labelText: 'API 키',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setState(
+                      () => _revealed.contains(v) ? _revealed.remove(v) : _revealed.add(v),
+                    ),
                   ),
                 ),
               ),
-            ),
             const SizedBox(height: 8),
             TextField(
               controller: _models[v],
