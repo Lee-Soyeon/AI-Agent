@@ -96,11 +96,11 @@ class _WritingStyleScreenState extends State<WritingStyleScreen> {
             )
           else
             FilledButton.icon(
-              onPressed: settings.isConfigured ? _learn : null,
+              onPressed: settings.isLocalLlmConfigured ? _learn : null,
               icon: const Icon(Icons.auto_fix_high),
               label: Text(profile == null ? '보낸 메일로 말투 학습하기' : '다시 학습하기'),
             ),
-          if (!settings.isConfigured)
+          if (!settings.isLocalLlmConfigured)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text('먼저 설정에서 LLM 을 연결하세요.', style: theme.textTheme.bodySmall),

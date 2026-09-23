@@ -46,3 +46,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# server
+server/data/
+server/.env
+**/__pycache__/
+.pytest_cache/

@@ -10,6 +10,7 @@ import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../openai/chatgpt_auth.dart';
 import 'browser_screen.dart';
+import 'remote_browser_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
 import 'writing_style_screen.dart';
@@ -106,10 +107,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Card(
             child: ListTile(
               leading: const Icon(Icons.auto_awesome),
-              title: Text(settings.vendor.label),
+              title: Text(settings.runOnServer ? '서버에서 실행 (백그라운드)' : settings.vendor.label),
               subtitle: Text(
                 settings.isConfigured
-                    ? '모델: ${settings.model(settings.vendor)}'
+                    ? (settings.runOnServer
+                          ? settings.serverUrl
+                          : '모델: ${settings.model(settings.vendor)}')
+                    : settings.runOnServer
+                    ? '서버 주소와 토큰을 설정하세요'
                     : 'API 키가 설정되지 않았습니다',
               ),
               trailing: const Icon(Icons.chevron_right),
@@ -119,28 +124,30 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           Text('연결된 서비스', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          for (final site in allSites)
-            Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: site.color,
-                  foregroundColor: Colors.white,
-                  child: Icon(site.icon),
+          if (settings.runOnServer) const _ServerBrowserCard(),
+          if (!settings.runOnServer)
+            for (final site in allSites)
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: site.color,
+                    foregroundColor: Colors.white,
+                    child: Icon(site.icon),
+                  ),
+                  title: Text(site.name),
+                  subtitle: Text(sessions.isLoggedIn(site) ? '로그인됨' : '로그인이 필요합니다'),
+                  trailing: sessions.isLoggedIn(site)
+                      ? PopupMenuButton<String>(
+                          onSelected: (v) => v == 'logout' ? sessions.logout(site) : _login(site),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'login', child: Text('다시 로그인')),
+                            PopupMenuItem(value: 'logout', child: Text('로그아웃')),
+                          ],
+                        )
+                      : FilledButton.tonal(onPressed: () => _login(site), child: const Text('로그인')),
                 ),
-                title: Text(site.name),
-                subtitle: Text(sessions.isLoggedIn(site) ? '로그인됨' : '로그인이 필요합니다'),
-                trailing: sessions.isLoggedIn(site)
-                    ? PopupMenuButton<String>(
-                        onSelected: (v) => v == 'logout' ? sessions.logout(site) : _login(site),
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'login', child: Text('다시 로그인')),
-                          PopupMenuItem(value: 'logout', child: Text('로그아웃')),
-                        ],
-                      )
-                    : FilledButton.tonal(onPressed: () => _login(site), child: const Text('로그인')),
               ),
-            ),
-          _GmailCard(google: google),
+          if (!settings.runOnServer) _GmailCard(google: google),
           const SizedBox(height: 16),
           Text('무엇을 해드릴까요?', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -171,6 +178,99 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => _task.text = e,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 서버 모드: 서버 브라우저에 사이트를 열어 사용자가 직접 로그인한다 (한 번만 하면 서버에 유지됨).
+class _ServerBrowserCard extends StatelessWidget {
+  const _ServerBrowserCard();
+
+  static const _presets = {
+    '쿠팡': 'https://login.coupang.com/login/login.pang',
+    '네이버': 'https://nid.naver.com/nidlogin.login',
+    'Gmail': 'https://accounts.google.com/ServiceLogin?service=mail',
+    '코레일': 'https://www.korail.com/ticket/login',
+  };
+
+  Future<void> _open(BuildContext context, String url) async {
+    final client = context.read<SettingsStore>().serverClient;
+    if (client == null) return;
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await client.openUrl(url);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    await nav.push<void>(
+      MaterialPageRoute(
+        builder: (_) => RemoteBrowserScreen(
+          client: client,
+          title: '서버 브라우저',
+          message:
+              '여기서 로그인하면 서버에 저장되어, 이후 작업은 백그라운드에서 진행됩니다. '
+              '"로그인 상태 유지"를 체크하세요.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _custom(BuildContext context) async {
+    final c = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('로그인할 사이트 주소'),
+        content: TextField(
+          controller: c,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(hintText: 'https://'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, c.text.trim()),
+            child: const Text('열기'),
+          ),
+        ],
+      ),
+    );
+    if (url == null || url.isEmpty || !context.mounted) return;
+    await _open(context, url.startsWith('http') ? url : 'https://$url');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(child: Icon(Icons.cloud)),
+              title: Text('서버 브라우저'),
+              subtitle: Text('사용할 서비스에 한 번만 로그인해 두세요. 어떤 웹 서비스든 됩니다.'),
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final e in _presets.entries)
+                  ActionChip(label: Text('${e.key} 로그인'), onPressed: () => _open(context, e.value)),
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: const Text('다른 사이트'),
+                  onPressed: () => _custom(context),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

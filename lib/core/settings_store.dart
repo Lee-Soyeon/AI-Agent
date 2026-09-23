@@ -8,6 +8,7 @@ import '../llm/gemini_provider.dart';
 import '../llm/llm_types.dart';
 import '../llm/openai_provider.dart';
 import '../openai/chatgpt_auth.dart';
+import '../remote/agent_server_client.dart';
 
 enum LlmVendor {
   openai('OpenAI API', 'gpt-4.1'),
@@ -37,6 +38,11 @@ class SettingsStore extends ChangeNotifier {
   final Map<LlmVendor, String> _models = {};
   int maxSteps = 60;
 
+  /// true 면 작업을 서버(server/)의 브라우저에서 백그라운드로 실행한다.
+  bool runOnServer = false;
+  String serverUrl = '';
+  String serverToken = '';
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     vendor = LlmVendor.values.firstWhere(
@@ -44,6 +50,13 @@ class SettingsStore extends ChangeNotifier {
       orElse: () => LlmVendor.anthropic,
     );
     maxSteps = prefs.getInt('maxSteps') ?? 60;
+    runOnServer = prefs.getBool('runOnServer') ?? false;
+    serverUrl = prefs.getString('serverUrl') ?? '';
+    try {
+      serverToken = await _secure.read(key: 'serverToken') ?? '';
+    } catch (_) {
+      serverToken = '';
+    }
     for (final v in LlmVendor.values) {
       _models[v] = prefs.getString('model_${v.name}') ?? v.defaultModel;
       try {
@@ -58,7 +71,32 @@ class SettingsStore extends ChangeNotifier {
   String apiKey(LlmVendor v) => _apiKeys[v] ?? '';
   String model(LlmVendor v) => _models[v] ?? v.defaultModel;
 
-  bool get isConfigured => vendor.usesApiKey ? apiKey(vendor).isNotEmpty : chatgpt.isSignedIn;
+  /// 폰에서 실행할 때의 LLM 설정이 됐는지.
+  bool get isLocalLlmConfigured =>
+      vendor.usesApiKey ? apiKey(vendor).isNotEmpty : chatgpt.isSignedIn;
+
+  bool get isServerConfigured => serverUrl.isNotEmpty && serverToken.isNotEmpty;
+
+  /// 작업을 시작할 수 있는지 (서버 모드면 LLM 은 서버가 가진 키를 쓴다).
+  bool get isConfigured => runOnServer ? isServerConfigured : isLocalLlmConfigured;
+
+  AgentServerClient? get serverClient =>
+      isServerConfigured ? AgentServerClient(baseUrl: serverUrl, token: serverToken) : null;
+
+  Future<void> saveServer({
+    required bool runOnServer,
+    required String url,
+    required String token,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    this.runOnServer = runOnServer;
+    serverUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
+    serverToken = token.trim();
+    await prefs.setBool('runOnServer', runOnServer);
+    await prefs.setString('serverUrl', serverUrl);
+    await _secure.write(key: 'serverToken', value: serverToken);
+    notifyListeners();
+  }
 
   Future<void> save({
     required LlmVendor vendor,

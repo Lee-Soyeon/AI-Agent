@@ -38,7 +38,7 @@ Future<void> main() async {
             google: google,
             writingStyle: writingStyle,
             navigatorKey: navigatorKey,
-          ),
+          )..attachToServer(),
         ),
       ],
       child: AiAgentApp(navigatorKey: navigatorKey),

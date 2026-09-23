@@ -9,6 +9,26 @@ OpenAI · Claude · Gemini 중 원하는 LLM으로 **웹사이트를 대신 조�
 - **나머지는 에이전트가 알아서 처리합니다.** 상품 검색, 장바구니 담기, 메일 요약, 답장 작성 등.
 - **결제와 메일 전송은 반드시 사용자 승인 후에만 합니다.** 이 규칙은 프롬프트뿐 아니라 코드에서도 강제됩니다.
 
+## 실행 위치: 이 폰 / 서버
+
+| | 이 폰 | 서버 (백그라운드) |
+| --- | --- | --- |
+| 브라우저 | 폰 안의 보이지 않는 웹뷰 | 서버의 실제 크롬 ([`server/`](server/README.md)) |
+| 앱을 꺼도 계속? | ❌ 멈출 수 있음 | ✅ 서버에서 계속, 앱을 열면 이어서 표시 |
+| 다룰 수 있는 서비스 | 쿠팡(웹) + Gmail(API) | **어떤 웹 서비스든** |
+| 로그인 | 앱 안 브라우저 | 앱의 **서버 브라우저** 화면(실시간 화면 + 탭/입력 전달)에서 한 번 |
+| LLM 키 | 폰 (API 키 또는 ChatGPT 구독) | 서버 환경 변수 |
+
+설정 → **실행 위치: 서버** → 서버 주소와 토큰 입력 → **연결 테스트**.
+서버 설치·배포는 [server/README.md](server/README.md) 를 보세요.
+
+```
+[앱] 작업 입력 ──POST /tasks──▶ [서버] AgentRunner ──▶ 크롬(Playwright, 로그인 프로필 유지)
+[앱] 1.5초마다 상태·로그·스크린샷 ◀──GET /tasks/{id}──┘
+[앱] 승인 카드 / 질문 ──POST approval·answer──▶ 멈춰 있던 작업 재개
+[앱] 서버 브라우저 화면 ◀══WS /live══▶ 캡차·인증번호·결제 비밀번호를 사용자가 직접 입력
+```
+
 ## 동작 흐름
 
 ```
@@ -29,6 +49,7 @@ OpenAI · Claude · Gemini 중 원하는 LLM으로 **웹사이트를 대신 조�
 ## 폴더 구조
 
 ```
+server/                           # 서버 모드 (Python · FastAPI · Playwright) — server/README.md
 lib/
 ├── main.dart                     # Provider 구성, 앱 시작
 ├── llm/                          # LLM 공급자 추상화 (도구 호출 지원)
@@ -56,8 +77,11 @@ lib/
 │   ├── prompts.dart              # 시스템 프롬프트
 │   ├── agent_models.dart         # 로그, 승인 요청, 질문 모델
 │   └── agent_controller.dart     # UI 상태 (ChangeNotifier)
+├── remote/
+│   └── agent_server_client.dart  # 서버 REST 클라이언트
 └── ui/
     ├── home_screen.dart          # 로그인 상태, 작업 입력, 예시
+    ├── remote_browser_screen.dart # 서버 브라우저 실시간 화면 (로그인·사용자 도움)
     ├── task_screen.dart          # 실시간 로그, 브라우저 스크린샷, 승인/질문 카드, 후속 지시
     ├── browser_screen.dart       # 사용자가 직접 조작하는 브라우저
     └── settings_screen.dart      # LLM 선택, API 키, 모델
@@ -70,6 +94,7 @@ flutter pub get
 flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<웹 클라이언트 ID>   # Android
 flutter run                                                             # iOS (xcconfig 사용)
 flutter test           # LLM 요청 변환, 승인 강제, Gmail API 테스트
+AGENT_SERVER_PYTHON=<server 의존성이 설치된 python> flutter test   # 앱↔서버 E2E 포함
 ```
 
 ### Gmail(Google 로그인) 설정 — 한 번만
