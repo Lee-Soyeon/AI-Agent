@@ -6,6 +6,8 @@ import '../browser/agent_browser.dart';
 import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
+import '../google/gmail_api.dart';
+import '../google/google_auth.dart';
 import '../ui/browser_screen.dart';
 import 'agent_models.dart';
 import 'agent_runner.dart';
@@ -13,10 +15,16 @@ import 'prompts.dart';
 
 /// UI 와 에이전트 실행기를 잇는 상태 객체.
 class AgentController extends ChangeNotifier implements AgentHooks {
-  AgentController({required this.settings, required this.sessions, required this.navigatorKey});
+  AgentController({
+    required this.settings,
+    required this.sessions,
+    required this.google,
+    required this.navigatorKey,
+  });
 
   final SettingsStore settings;
   final SiteSessionStore sessions;
+  final GoogleAuthService google;
   final GlobalKey<NavigatorState> navigatorKey;
 
   final AgentBrowser _browser = AgentBrowser();
@@ -48,8 +56,11 @@ class AgentController extends ChangeNotifier implements AgentHooks {
       browser: _browser,
       hooks: this,
       maxSteps: settings.maxSteps,
+      gmail: google.isSignedIn ? GmailApi(authHeaders: google.authHeaders) : null,
+      gmailAddress: google.email,
       systemPrompt: buildSystemPrompt(
         loginState: {for (final s in allSites) s: sessions.isLoggedIn(s)},
+        gmailAccount: google.email,
       ),
     );
     await _run(task);

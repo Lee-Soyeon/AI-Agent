@@ -1,0 +1,9 @@
+// Google 로그인(Gmail API) 설정.
+// Google Cloud Console > API 및 서비스 > 사용자 인증 정보 > OAuth 클라이언트 ID (유형: iOS, 번들 ID: ai.aioia.aiAgent)
+// 를 만든 뒤 아래 두 값을 채우세요. (클라이언트 ID 는 비밀 값이 아니므로 커밋해도 됩니다.)
+//
+// 예)
+// GOOGLE_IOS_CLIENT_ID = 1234567890-abcdefg.apps.googleusercontent.com
+// GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.1234567890-abcdefg
+GOOGLE_IOS_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE-ME

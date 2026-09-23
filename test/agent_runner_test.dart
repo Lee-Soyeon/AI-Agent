@@ -1,11 +1,15 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:ai_agent/agent/agent_models.dart';
 import 'package:ai_agent/agent/agent_runner.dart';
 import 'package:ai_agent/agent/safety.dart';
 import 'package:ai_agent/browser/agent_browser.dart';
+import 'package:ai_agent/google/gmail_api.dart';
 import 'package:ai_agent/llm/llm_types.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 class _ScriptedLlm implements LlmProvider {
   _ScriptedLlm(this.turns);
@@ -72,6 +76,7 @@ class _Hooks implements AgentHooks {
   final bool approve;
   final logs = <AgentLogEntry>[];
   int approvals = 0;
+  ApprovalRequest? lastApproval;
 
   @override
   void onLog(AgentLogEntry entry) => logs.add(entry);
@@ -82,6 +87,7 @@ class _Hooks implements AgentHooks {
   @override
   Future<ApprovalDecision> requestApproval(ApprovalRequest request) async {
     approvals++;
+    lastApproval = request;
     return ApprovalDecision(approved: approve, feedback: approve ? null : '다른 상품으로');
   }
 
@@ -185,5 +191,94 @@ void main() {
     expect(msgs[1].text, contains('생략됨'));
     expect(msgs[2].text, contains('긴 본문'));
     expect(msgs[3].text, contains('긴 본문'));
+  });
+
+  group('gmail_send', () {
+    late List<Map<String, dynamic>> posts;
+    late GmailApi api;
+
+    setUp(() {
+      posts = [];
+      api = GmailApi(
+        authHeaders: ({refresh = false, staleToken}) async => {'Authorization': 'Bearer t'},
+        client: MockClient((req) async {
+          posts.add(jsonDecode(req.body) as Map<String, dynamic>);
+          return http.Response(jsonEncode({'id': 'sent-1'}), 200);
+        }),
+      );
+    });
+
+    LlmResponse send() => _call('gmail_send', {
+      'to': ['kim@example.com'],
+      'subject': '회의 일정',
+      'body': '내일 3시에 뵙겠습니다.',
+    });
+
+    test('승인하면 승인 카드에 보인 내용 그대로 한 번만 보낸다', () async {
+      final llm = _ScriptedLlm([send(), const LlmResponse(text: '보냈습니다')]);
+      final hooks = _Hooks();
+      final runner = AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: hooks,
+        systemPrompt: 's',
+        gmail: api,
+        gmailAddress: 'me@gmail.com',
+      );
+      await runner.run('김 과장에게 메일 보내줘');
+
+      expect(hooks.approvals, 1);
+      expect(hooks.lastApproval!.kind, ApprovalKind.sendEmail);
+      expect(hooks.lastApproval!.summary, contains('kim@example.com'));
+      expect(hooks.lastApproval!.details, '내일 3시에 뵙겠습니다.');
+      expect(posts, hasLength(1));
+      final mime = GmailApi.decodeBase64Url(posts.single['raw'] as String);
+      expect(mime, contains('To: kim@example.com'));
+      expect(_lastToolResult(llm.seen[1]), contains('전송 완료'));
+    });
+
+    test('거절하면 보내지 않고 의견을 돌려준다', () async {
+      final llm = _ScriptedLlm([send(), const LlmResponse(text: '안 보냄')]);
+      final runner = AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: _Hooks(approve: false),
+        systemPrompt: 's',
+        gmail: api,
+      );
+      await runner.run('메일 보내줘');
+      expect(posts, isEmpty);
+      expect(_lastToolResult(llm.seen[1]), contains('다른 상품으로'));
+    });
+
+    test('잘못된 주소나 Gmail 미연결이면 승인 요청 없이 오류', () async {
+      final llm = _ScriptedLlm([
+        _call('gmail_send', {
+          'to': ['not-an-email'],
+          'subject': 's',
+          'body': 'b',
+        }),
+        const LlmResponse(text: '끝'),
+      ]);
+      final hooks = _Hooks();
+      await AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: hooks,
+        systemPrompt: 's',
+        gmail: api,
+      ).run('보내');
+      expect(hooks.approvals, 0);
+      expect(_lastToolResult(llm.seen[1]), contains('올바르지 않은 이메일'));
+
+      final llm2 = _ScriptedLlm([send(), const LlmResponse(text: '끝')]);
+      await AgentRunner(
+        llm: llm2,
+        browser: _FakeBrowser(),
+        hooks: _Hooks(),
+        systemPrompt: 's',
+      ).run('보내');
+      expect(_lastToolResult(llm2.seen[1]), contains('연결되어 있지 않습니다'));
+    });
   });
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../browser/agent_browser.dart';
+import '../google/gmail_api.dart';
 import '../llm/llm_types.dart';
 import 'agent_models.dart';
 import 'agent_tools.dart';
@@ -20,6 +21,8 @@ class AgentRunner {
     required this.hooks,
     required this.systemPrompt,
     this.maxSteps = 60,
+    this.gmail,
+    this.gmailAddress,
     SafetyPolicy? safety,
   }) : safety = safety ?? SafetyPolicy();
 
@@ -29,6 +32,10 @@ class AgentRunner {
   final String systemPrompt;
   final int maxSteps;
   final SafetyPolicy safety;
+
+  /// Google 계정이 연결되지 않았으면 null.
+  final GmailApi? gmail;
+  final String? gmailAddress;
 
   final List<ChatMessage> messages = [];
   bool _cancelled = false;
@@ -252,6 +259,78 @@ class AgentRunner {
           if (target != null && target.startsWith('http')) await browser.navigate(target);
           return await _observe('사용자가 직접 처리를 마쳤습니다. 페이지를 다시 확인하세요.');
 
+        case AgentTools.gmailSearch:
+          final api = gmail;
+          if (api == null) return _gmailNotConnected();
+          final q = '${a['query'] ?? ''}';
+          final found = await api.search(q, maxResults: asInt(a['max_results']) ?? 10);
+          hooks.onLog(
+            AgentLogEntry(
+              LogKind.observation,
+              '메일 ${found.length}통 찾음',
+              detail: found.map((m) => m.toPrompt()).join('\n'),
+            ),
+          );
+          return _Outcome(
+            found.isEmpty
+                ? '검색 결과가 없습니다. (검색어: $q)'
+                : '검색 결과 ${found.length}통:\n${found.map((m) => m.toPrompt()).join('\n')}',
+          );
+
+        case AgentTools.gmailRead:
+          final api = gmail;
+          if (api == null) return _gmailNotConnected();
+          final msg = await api.read('${a['message_id'] ?? ''}');
+          final text = msg.toPrompt();
+          hooks.onLog(
+            AgentLogEntry(LogKind.observation, '메일 읽음: ${msg.header('subject')}', detail: text),
+          );
+          return _Outcome(text);
+
+        case AgentTools.gmailSend:
+          final api = gmail;
+          if (api == null) return _gmailNotConnected();
+          final email = OutgoingEmail(
+            to: _stringList(a['to']),
+            cc: _stringList(a['cc']),
+            subject: '${a['subject'] ?? ''}',
+            body: '${a['body'] ?? ''}',
+            replyToMessageId: (a['reply_to_message_id'] as String?)?.trim().isEmpty ?? true
+                ? null
+                : (a['reply_to_message_id'] as String).trim(),
+          );
+          final invalid = [...email.to, ...email.cc].where((e) => !_emailRe.hasMatch(e)).toList();
+          if (email.to.isEmpty) return _error('받는 사람(to)이 없습니다.');
+          if (invalid.isNotEmpty) return _error('올바르지 않은 이메일 주소: ${invalid.join(', ')}');
+
+          // 승인 카드에 보여준 내용 그대로만 전송한다.
+          final req = ApprovalRequest(
+            kind: ApprovalKind.sendEmail,
+            title: email.replyToMessageId == null ? '메일 전송 승인' : '답장 전송 승인',
+            summary: [
+              if (gmailAddress != null) '보내는 사람: $gmailAddress',
+              '받는 사람: ${email.to.join(', ')}',
+              if (email.cc.isNotEmpty) '참조: ${email.cc.join(', ')}',
+              '제목: ${email.subject}',
+            ].join('\n'),
+            details: email.body,
+          );
+          hooks.onStatus(AgentStatus.waitingApproval);
+          final decision = await hooks.requestApproval(req);
+          hooks.onStatus(AgentStatus.running);
+          if (!decision.approved) {
+            final fb = decision.feedback?.trim() ?? '';
+            hooks.onLog(AgentLogEntry(LogKind.approval, '❌ 메일 전송 거절${fb.isEmpty ? '' : ': $fb'}'));
+            return _Outcome(
+              fb.isEmpty
+                  ? '거절됨. 메일을 보내지 않았습니다. 보내지 말고 finish 로 보고하세요.'
+                  : '거절됨. 사용자 의견: "$fb". 의견을 반영해 수정한 뒤 gmail_send 를 다시 호출하세요.',
+            );
+          }
+          final sentId = await api.send(email, fromAddress: gmailAddress);
+          hooks.onLog(AgentLogEntry(LogKind.approval, '✅ 메일을 보냈습니다: ${email.subject}'));
+          return _Outcome('전송 완료 (id: $sentId)');
+
         case AgentTools.finish:
           final s = '${a['summary'] ?? '완료했습니다.'}';
           return _Outcome('보고 완료', finishSummary: s);
@@ -260,6 +339,8 @@ class AgentRunner {
           return _error('알 수 없는 도구: ${call.name}');
       }
     } on BrowserException catch (e) {
+      return _error(e.message);
+    } on GmailException catch (e) {
       return _error(e.message);
     } catch (e) {
       return _error('도구 실행 중 오류: $e');
@@ -276,6 +357,19 @@ class AgentRunner {
     );
     return _Outcome('$prefix\n\n$snapshotHeader\n$body');
   }
+
+  static final _emailRe = RegExp(r'^[^@\s<>,;"]+@[^@\s<>,;"]+\.[^@\s<>,;"]+$');
+
+  static List<String> _stringList(Object? v) => switch (v) {
+    List() => [for (final e in v) '$e'.trim()].where((e) => e.isNotEmpty).toList(),
+    String() => v.split(RegExp(r'[,;]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+    _ => const [],
+  };
+
+  _Outcome _gmailNotConnected() => _error(
+    'Gmail(Google 계정)이 연결되어 있지 않습니다. '
+    '사용자에게 홈 화면에서 "Google 계정 연결"을 눌러 달라고 finish 로 안내하세요.',
+  );
 
   _Outcome _error(String msg) {
     hooks.onLog(AgentLogEntry(LogKind.error, msg));
@@ -296,6 +390,9 @@ class AgentRunner {
       AgentTools.askUser => '❓ 질문: ${a['question']}',
       AgentTools.requestUserHelp => '🧑 사용자 도움 요청: ${a['reason']}',
       AgentTools.finish => '🏁 완료',
+      AgentTools.gmailSearch => '📬 메일 검색: ${a['query']}',
+      AgentTools.gmailRead => '📖 메일 읽기',
+      AgentTools.gmailSend => '✉️ 메일 전송 준비: ${a['subject']}',
       _ => '${c.name} $a',
     };
   }

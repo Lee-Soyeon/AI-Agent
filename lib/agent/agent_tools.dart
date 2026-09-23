@@ -12,6 +12,9 @@ class AgentTools {
   static const askUser = 'ask_user';
   static const requestUserHelp = 'request_user_help';
   static const finish = 'finish';
+  static const gmailSearch = 'gmail_search';
+  static const gmailRead = 'gmail_read';
+  static const gmailSend = 'gmail_send';
 
   static const _elementId = {
     'type': 'integer',
@@ -128,6 +131,58 @@ class AgentTools {
           'reason': {'type': 'string', 'description': '사용자에게 보여줄 안내 (무엇을 해달라는지)'},
         },
         'required': ['reason'],
+      },
+    ),
+    const ToolSpec(
+      name: gmailSearch,
+      description:
+          'Gmail API 로 메일을 검색한다. Gmail 검색 문법을 쓴다 '
+          '(예: "is:unread", "in:inbox newer_than:3d", "from:kim@example.com", "subject:견적"). '
+          '빈 문자열이면 최근 메일. 결과: id, 보낸 사람, 제목, 날짜, 미리보기.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'query': {'type': 'string'},
+          'max_results': {'type': 'integer', 'description': '1~30, 기본 10'},
+        },
+        'required': ['query'],
+      },
+    ),
+    const ToolSpec(
+      name: gmailRead,
+      description: 'Gmail 메일 한 통의 헤더와 본문 전체를 읽는다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'message_id': {'type': 'string', 'description': 'gmail_search 결과의 id'},
+        },
+        'required': ['message_id'],
+      },
+    ),
+    const ToolSpec(
+      name: gmailSend,
+      description:
+          '메일을 보낸다. 호출하면 앱이 사용자에게 받는 사람·제목·본문 전체를 보여주고 승인을 받은 뒤에만 '
+          '정확히 그 내용으로 전송한다 (request_approval 을 따로 부를 필요 없음). '
+          '거절되면 사용자 의견이 돌아오니 반영해서 다시 호출하라. '
+          '답장이면 reply_to_message_id 를 넣으면 같은 스레드로 보내진다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'to': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description': '받는 사람 이메일 주소 목록',
+          },
+          'cc': {
+            'type': 'array',
+            'items': {'type': 'string'},
+          },
+          'subject': {'type': 'string'},
+          'body': {'type': 'string', 'description': '본문 (일반 텍스트)'},
+          'reply_to_message_id': {'type': 'string', 'description': '답장할 원본 메일 id (선택)'},
+        },
+        'required': ['to', 'subject', 'body'],
       },
     ),
     const ToolSpec(

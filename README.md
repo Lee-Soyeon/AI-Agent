@@ -2,19 +2,23 @@
 
 OpenAI · Claude · Gemini 중 원하는 LLM으로 **웹사이트를 대신 조작하는 AI 에이전트 앱**입니다.
 
-- **로그인만 사용자가 합니다.** 앱 안 브라우저로 쿠팡/Gmail에 로그인하면 창이 자동으로 닫힙니다.
-- **나머지는 에이전트가 화면 없이(헤드리스 웹뷰) 처리합니다.** 상품 검색, 장바구니 담기, 메일 읽기·요약·작성 등.
+- **로그인만 사용자가 합니다.**
+  - 쿠팡: 앱 안 브라우저로 로그인하면 창이 자동으로 닫히고, 이후 에이전트가 화면 없는 웹뷰(헤드리스)로 조작합니다.
+  - Gmail: 공식 **Google 로그인**으로 계정을 연결하면, 에이전트가 **Gmail API**로 메일을 검색·읽기·전송합니다.
+- **나머지는 에이전트가 알아서 처리합니다.** 상품 검색, 장바구니 담기, 메일 요약, 답장 작성 등.
 - **결제와 메일 전송은 반드시 사용자 승인 후에만 합니다.** 이 규칙은 프롬프트뿐 아니라 코드에서도 강제됩니다.
 
 ## 동작 흐름
 
 ```
-[홈] 쿠팡/Gmail 로그인 ──▶ 보이는 InAppWebView (사용자가 로그인) ──▶ 로그인 URL 감지 시 자동으로 닫힘
+[홈] 쿠팡 로그인 ──▶ 보이는 InAppWebView (사용자가 로그인) ──▶ 로그인 URL 감지 시 자동으로 닫힘
                                             │  (쿠키 공유)
 [홈] "생수 12개 담고 결제 승인 받아줘" ──▶ AgentRunner ──▶ HeadlessInAppWebView (화면 없음)
                                             │
              LLM ◀── 페이지 스냅샷(텍스트 + 요소 id) ── read_page / open_url / click / type_text / scroll
                                             │
+             gmail_search / gmail_read ──▶ Gmail API (Google 로그인 토큰)
+             gmail_send ──▶ 승인 카드에 받는 사람·제목·본문 표시 → 승인 시 그 내용 그대로 전송
              request_approval ──▶ [작업 화면] 승인 카드 (승인 / 거절 / 수정 요청)
              request_user_help ──▶ 보이는 브라우저 (캡차, 2단계 인증, 결제 비밀번호)
              ask_user ──▶ 선택지 질문
@@ -35,8 +39,11 @@ lib/
 │   ├── agent_browser.dart        # 헤드리스 웹뷰 제어 (이동/스냅샷/클릭/입력/스크린샷)
 │   ├── dom_scripts.dart          # 주입 JS: 보이는 요소에 id 부여, React 호환 입력 등
 │   ├── web_settings.dart         # 로그인용·에이전트용 웹뷰 공통 설정(UA, 쿠키)
-│   ├── sites.dart                # 사이트 정의 (쿠팡, Gmail) — 여기에 새 사이트 추가
+│   ├── sites.dart                # 웹 자동화 사이트 정의 (쿠팡) — 여기에 새 사이트 추가
 │   └── session_store.dart        # 사이트별 로그인 상태, 로그아웃(쿠키 삭제)
+├── google/
+│   ├── google_auth.dart          # Google 로그인 + Gmail 권한(access token) 관리
+│   └── gmail_api.dart            # Gmail REST: 검색, 읽기(HTML→텍스트), 전송(MIME, 답장 스레드)
 ├── agent/
 │   ├── agent_runner.dart         # LLM ↔ 도구 실행 루프, 스냅샷 압축, 재시도
 │   ├── agent_tools.dart          # LLM 에게 주는 도구 목록
@@ -55,20 +62,43 @@ lib/
 
 ```bash
 flutter pub get
-flutter run            # Android 기기/에뮬레이터 또는 iOS 기기/시뮬레이터
-flutter test           # LLM 요청 변환, 승인 강제 로직 테스트
+flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<웹 클라이언트 ID>   # Android
+flutter run                                                             # iOS (xcconfig 사용)
+flutter test           # LLM 요청 변환, 승인 강제, Gmail API 테스트
 ```
+
+### Gmail(Google 로그인) 설정 — 한 번만
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 만들고 **Gmail API 사용 설정**.
+2. **OAuth 동의 화면**(Google Auth Platform)
+   - 사용자 유형: 외부, 게시 상태: **테스트**
+   - 범위(Data access): `gmail.readonly`, `gmail.send`
+   - **테스트 사용자**에 사용할 Gmail 주소 추가 (테스트 모드에서는 최대 100명, 이 사람들만 로그인 가능)
+3. **사용자 인증 정보 → OAuth 클라이언트 ID** 를 만든다.
+   - **iOS**: 번들 ID `ai.aioia.aiAgent` → 발급된 클라이언트 ID 와 역방향 ID(`com.googleusercontent.apps.…`)를
+     `ios/Flutter/GoogleSignIn.xcconfig` 에 입력
+   - **Android**: 패키지 이름 `ai.aioia.ai_agent` + 서명 인증서 SHA-1 (`cd android && ./gradlew signingReport`).
+     디버그/릴리스/Play 앱 서명 키마다 SHA-1 을 각각 등록해야 함
+   - **웹 애플리케이션**: 하나 만들어 그 ID 를 Android 실행 시 `--dart-define=GOOGLE_SERVER_CLIENT_ID=...` 로 전달
+4. 앱 홈에서 **Google 계정 연결** → 계정 선택 → Gmail 권한 허용.
+
+> `gmail.readonly` / `gmail.send` 는 Google 의 **제한된(restricted) 범위**입니다. 테스트 모드(등록한 테스트 사용자)로는 바로 쓸 수 있지만,
+> 일반 사용자에게 공개하려면 Google 앱 인증(보안 평가 포함)을 받아야 합니다.
+
+### 사용 순서
 
 1. 앱 오른쪽 위 **설정**에서 사용할 LLM을 고르고 API 키를 입력합니다.
    - 기본 모델: OpenAI `gpt-4.1`, Claude `claude-sonnet-5`, Gemini `gemini-2.5-flash` (설정에서 변경 가능)
-2. 홈에서 **쿠팡 / Gmail 로그인**을 누르고 직접 로그인합니다. 로그인되면 창이 자동으로 닫힙니다.
+2. 홈에서 **쿠팡 로그인**(인앱 브라우저, 로그인되면 자동으로 닫힘)과 **Google 계정 연결**을 합니다.
 3. 할 일을 입력하고 **실행**을 누릅니다. 결제·전송 직전에 승인 카드가 뜹니다.
 
 ## 안전장치
 
 | 위험 | 대응 |
 | --- | --- |
-| LLM이 승인 없이 결제/전송 | `SafetyPolicy`가 클릭 대상 버튼 문구(결제하기, 주문하기, 보내기, Send 등)를 검사해 **승인이 없으면 코드에서 차단**. 승인은 1회용이며 10분 뒤 만료 |
+| LLM이 승인 없이 결제 | `SafetyPolicy`가 클릭 대상 버튼 문구(결제하기, 주문하기, 보내기, Send 등)를 검사해 **승인이 없으면 코드에서 차단**. 승인은 1회용이며 10분 뒤 만료 |
+| LLM이 승인 없이 메일 전송 / 승인 후 내용 바꿔치기 | `gmail_send` 도구 자체가 승인 카드를 띄우고, **승인 카드에 보인 받는 사람·제목·본문 그대로만** 전송. 헤더 줄바꿈 제거로 헤더 인젝션(Bcc 추가 등) 차단 |
+| Gmail 계정 비밀번호 | 앱을 거치지 않고 Google 공식 로그인 화면에서만 입력. 앱은 access token 만 사용하며 연결 해제 시 권한 철회(disconnect) |
 | 이메일·웹페이지 속 악성 지시(프롬프트 인젝션) | 시스템 프롬프트로 무시하도록 지시 + 위 코드 레벨 차단으로 최종 방어 |
 | 비밀번호 유출 | 에이전트는 `type=password` 입력창에 입력할 수 없음. 로그인/결제 비밀번호는 항상 사용자가 직접 입력. 앱은 비밀번호를 저장하지 않음 |
 | 임의 코드 실행 | LLM 에게 임의 JavaScript 실행 도구를 주지 않음 (정해진 스크립트만 사용) |
@@ -77,11 +107,10 @@ flutter test           # LLM 요청 변환, 승인 강제 로직 테스트
 
 ## 알아둘 제약 사항
 
-- **Google 로그인**: Google 은 임베디드 웹뷰 로그인을 막는 경우가 있습니다(`disallowed_useragent`). 이를 피하려고 일반 모바일 브라우저 User-Agent 를 쓰지만, 계정·지역에 따라 여전히 막힐 수 있습니다. 안정적인 상용 서비스라면 Gmail 은 **Google Sign-In + Gmail API(OAuth)** 로 바꾸는 것을 권장합니다 (`sites.dart`/도구를 API 기반으로 추가하면 됩니다).
 - **쿠팡**: 자동화 접근은 쿠팡 이용약관과 봇 탐지 정책의 영향을 받을 수 있습니다. 화면 구조가 바뀌어도 LLM 이 스냅샷을 보고 판단하므로 셀렉터를 하드코딩하지 않았지만, 결제 비밀번호(쿠페이) 입력은 항상 사용자에게 넘깁니다.
 - **백그라운드 실행**: 에이전트는 화면에 보이지 않는 웹뷰에서 동작하므로 앱 안에서는 다른 화면을 봐도 계속 진행됩니다. 다만 앱 자체를 내리면 iOS 는 곧 실행을 멈추고, Android 도 절전 정책에 따라 멈출 수 있습니다. 완전한 백그라운드 실행이 필요하면 Android Foreground Service, 알림(승인 요청 푸시) 등을 추가해야 합니다.
 - **도움 요청 시 페이지 상태**: 캡차·결제 비밀번호 등으로 사용자에게 넘길 때 같은 URL 을 보이는 브라우저에서 새로 엽니다. URL 에 담기지 않은 화면 상태(예: 결제 팝업)는 다시 열어야 할 수 있습니다.
 
 ## 새 사이트 추가
 
-`lib/browser/sites.dart` 에 `SiteConfig` 를 하나 추가하고 `allSites` 에 넣으면 됩니다. 로그인 URL, 시작 URL, 로그인 완료를 판별할 URL 패턴, 에이전트에게 줄 팁만 적으면 홈 화면과 시스템 프롬프트에 자동으로 반영됩니다.
+웹 자동화 사이트는 `lib/browser/sites.dart` 에 `SiteConfig` 를 하나 추가하고 `allSites` 에 넣으면 됩니다. 로그인 URL, 시작 URL, 로그인 완료를 판별할 URL 패턴, 에이전트에게 줄 팁만 적으면 홈 화면과 시스템 프롬프트에 자동으로 반영됩니다.

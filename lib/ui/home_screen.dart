@@ -6,6 +6,7 @@ import '../agent/agent_models.dart';
 import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
+import '../google/google_auth.dart';
 import 'browser_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
@@ -85,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final settings = context.watch<SettingsStore>();
     final sessions = context.watch<SiteSessionStore>();
     final agent = context.watch<AgentController>();
+    final google = context.watch<GoogleAuthService>();
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -133,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : FilledButton.tonal(onPressed: () => _login(site), child: const Text('로그인')),
               ),
             ),
+          _GmailCard(google: google),
           const SizedBox(height: 16),
           Text('무엇을 해드릴까요?', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -161,6 +164,53 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.lightbulb_outline, size: 20),
               title: Text(e),
               onTap: () => _task.text = e,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GmailCard extends StatelessWidget {
+  const _GmailCard({required this.google});
+
+  final GoogleAuthService google;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFF1A73E8),
+              foregroundColor: Colors.white,
+              child: Icon(Icons.mail),
+            ),
+            title: const Text('Gmail'),
+            subtitle: Text(
+              google.isSignedIn ? '${google.email} · Gmail API 연결됨' : 'Google 계정 연결이 필요합니다',
+            ),
+            trailing: google.busy
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : google.isSignedIn
+                ? PopupMenuButton<String>(
+                    onSelected: (_) => google.signOut(),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'logout', child: Text('연결 해제 (권한 철회)')),
+                    ],
+                  )
+                : FilledButton.tonal(onPressed: google.signIn, child: const Text('Google 계정 연결')),
+          ),
+          if (google.error != null && !google.isSignedIn)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(google.error!, style: TextStyle(color: scheme.error, fontSize: 12)),
             ),
         ],
       ),
