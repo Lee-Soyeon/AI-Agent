@@ -7,16 +7,19 @@ import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
+import '../google/writing_style.dart';
 import '../openai/chatgpt_auth.dart';
 import 'browser_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
+import 'writing_style_screen.dart';
 
 const _examples = [
   '쿠팡에서 삼다수 2L 12개 로켓배송 제일 싼 걸 장바구니에 담고, 결제 전에 나한테 승인 받아줘',
   '쿠팡 장바구니에 뭐가 들어있는지 알려줘',
   'Gmail 에서 안 읽은 메일 5개 요약해줘',
   'Gmail 에서 가장 최근 메일에 "확인했습니다, 감사합니다" 라고 답장 써서 승인 받고 보내줘',
+  '안 읽은 메일 중 답장이 필요한 것에 평소 내 말투로 답장 초안 써줘',
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -213,6 +216,28 @@ class _GmailCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Text(google.error!, style: TextStyle(color: scheme.error, fontSize: 12)),
+            ),
+          if (google.isSignedIn)
+            Builder(
+              builder: (context) {
+                final style = context.watch<WritingStyleStore>();
+                final p = style.profile;
+                return ListTile(
+                  leading: const Icon(Icons.draw_outlined),
+                  title: const Text('내 메일 말투'),
+                  subtitle: Text(
+                    style.busy
+                        ? (style.progress ?? '학습 중…')
+                        : p == null
+                        ? '보낸 메일로 학습하면 내가 쓴 것처럼 작성합니다'
+                        : '보낸 메일 ${p.analyzedCount}통으로 학습됨',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () =>
+                      Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => const WritingStyleScreen())),
+                );
+              },
             ),
         ],
       ),

@@ -75,14 +75,15 @@ class GeminiProvider implements LlmProvider {
         ],
       },
       'contents': contents,
-      'tools': [
-        {
-          'functionDeclarations': [
-            for (final t in tools)
-              {'name': t.name, 'description': t.description, 'parameters': t.parameters},
-          ],
-        },
-      ],
+      if (tools.isNotEmpty)
+        'tools': [
+          {
+            'functionDeclarations': [
+              for (final t in tools)
+                {'name': t.name, 'description': t.description, 'parameters': t.parameters},
+            ],
+          },
+        ],
     };
   }
 

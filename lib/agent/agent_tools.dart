@@ -15,6 +15,7 @@ class AgentTools {
   static const gmailSearch = 'gmail_search';
   static const gmailRead = 'gmail_read';
   static const gmailSend = 'gmail_send';
+  static const gmailStyleExamples = 'gmail_style_examples';
 
   static const _elementId = {
     'type': 'integer',
@@ -157,6 +158,20 @@ class AgentTools {
           'message_id': {'type': 'string', 'description': 'gmail_search 결과의 id'},
         },
         'required': ['message_id'],
+      },
+    ),
+    const ToolSpec(
+      name: gmailStyleExamples,
+      description:
+          '메일을 쓰기 전에 반드시 호출한다. 사용자가 실제로 보낸 메일(보낸편지함) 중 '
+          '같은 받는 사람에게 보낸 메일을 예시로 돌려준다. 없으면 최근 보낸 메일을 준다. '
+          '인사말·호칭·어미·문단·맺음말·서명을 예시와 똑같이 따라 쓰기 위한 것이다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'recipient': {'type': 'string', 'description': '받는 사람 이메일 주소 (알면)'},
+          'query': {'type': 'string', 'description': '추가 Gmail 검색어 (선택, 예: "subject:견적")'},
+        },
       },
     ),
     const ToolSpec(

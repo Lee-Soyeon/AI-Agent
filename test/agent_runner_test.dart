@@ -195,18 +195,60 @@ void main() {
 
   group('gmail_send', () {
     late List<Map<String, dynamic>> posts;
+    late List<String> searches;
     late GmailApi api;
+
+    String b64(String s) => base64Url.encode(utf8.encode(s)).replaceAll('=', '');
 
     setUp(() {
       posts = [];
+      searches = [];
       api = GmailApi(
         authHeaders: ({refresh = false, staleToken}) async => {'Authorization': 'Bearer t'},
         client: MockClient((req) async {
+          if (req.method == 'GET' && req.url.path.endsWith('/messages')) {
+            searches.add(req.url.queryParameters['q'] ?? '');
+            return http.Response(
+              jsonEncode({
+                'messages': [
+                  {'id': 'old-1'},
+                ],
+              }),
+              200,
+            );
+          }
+          if (req.method == 'GET') {
+            // 사용자가 예전에 kim 에게 보낸 메일 (아래는 인용된 상대방 메일)
+            return http.Response.bytes(
+              utf8.encode(
+                jsonEncode({
+                  'id': 'old-1',
+                  'threadId': 't',
+                  'payload': {
+                    'mimeType': 'text/plain',
+                    'headers': [
+                      {'name': 'To', 'value': 'kim@example.com'},
+                      {'name': 'Subject', 'value': '견적 회신'},
+                    ],
+                    'body': {
+                      'data': b64(
+                        '김과장님 안녕하세요,\n이소연입니다.\n\n확인 부탁드립니다.\n\n이소연 드림\n\n'
+                        '2026년 9월 1일 (월) 오전 9:00, 김과장 <kim@example.com>님이 작성:\n> 견적 보내주세요',
+                      ),
+                    },
+                  },
+                }),
+              ),
+              200,
+            );
+          }
           posts.add(jsonDecode(req.body) as Map<String, dynamic>);
           return http.Response(jsonEncode({'id': 'sent-1'}), 200);
         }),
       );
     });
+
+    LlmResponse style() => _call('gmail_style_examples', {'recipient': 'kim@example.com'}, 'st');
 
     LlmResponse send() => _call('gmail_send', {
       'to': ['kim@example.com'],
@@ -215,7 +257,7 @@ void main() {
     });
 
     test('승인하면 승인 카드에 보인 내용 그대로 한 번만 보낸다', () async {
-      final llm = _ScriptedLlm([send(), const LlmResponse(text: '보냈습니다')]);
+      final llm = _ScriptedLlm([style(), send(), const LlmResponse(text: '보냈습니다')]);
       final hooks = _Hooks();
       final runner = AgentRunner(
         llm: llm,
@@ -234,11 +276,16 @@ void main() {
       expect(posts, hasLength(1));
       final mime = GmailApi.decodeBase64Url(posts.single['raw'] as String);
       expect(mime, contains('To: kim@example.com'));
-      expect(_lastToolResult(llm.seen[1]), contains('전송 완료'));
+      expect(_lastToolResult(llm.seen[2]), contains('전송 완료'));
+      expect(searches, ['in:sent to:kim@example.com']);
+      final examples = _lastToolResult(llm.seen[1]);
+      expect(examples, contains('김과장님 안녕하세요'));
+      expect(examples, contains('이소연 드림'));
+      expect(examples, isNot(contains('견적 보내주세요'))); // 인용문은 제외
     });
 
     test('거절하면 보내지 않고 의견을 돌려준다', () async {
-      final llm = _ScriptedLlm([send(), const LlmResponse(text: '안 보냄')]);
+      final llm = _ScriptedLlm([style(), send(), const LlmResponse(text: '안 보냄')]);
       final runner = AgentRunner(
         llm: llm,
         browser: _FakeBrowser(),
@@ -248,11 +295,27 @@ void main() {
       );
       await runner.run('메일 보내줘');
       expect(posts, isEmpty);
-      expect(_lastToolResult(llm.seen[1]), contains('다른 상품으로'));
+      expect(_lastToolResult(llm.seen[2]), contains('다른 상품으로'));
+    });
+
+    test('말투 예시를 확인하기 전의 gmail_send 는 한 번 막는다', () async {
+      final llm = _ScriptedLlm([send(), send(), const LlmResponse(text: '보냄')]);
+      final hooks = _Hooks();
+      await AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: hooks,
+        systemPrompt: 's',
+        gmail: api,
+      ).run('메일 보내줘');
+      expect(_lastToolResult(llm.seen[1]), contains('gmail_style_examples'));
+      expect(hooks.approvals, 1); // 두 번째 시도에서만 승인 요청
+      expect(posts, hasLength(1));
     });
 
     test('잘못된 주소나 Gmail 미연결이면 승인 요청 없이 오류', () async {
       final llm = _ScriptedLlm([
+        style(),
         _call('gmail_send', {
           'to': ['not-an-email'],
           'subject': 's',
@@ -269,7 +332,7 @@ void main() {
         gmail: api,
       ).run('보내');
       expect(hooks.approvals, 0);
-      expect(_lastToolResult(llm.seen[1]), contains('올바르지 않은 이메일'));
+      expect(_lastToolResult(llm.seen[2]), contains('올바르지 않은 이메일'));
 
       final llm2 = _ScriptedLlm([send(), const LlmResponse(text: '끝')]);
       await AgentRunner(

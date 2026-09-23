@@ -1,4 +1,5 @@
 import 'package:ai_agent/llm/anthropic_provider.dart';
+import 'package:ai_agent/llm/chatgpt_codex_provider.dart';
 import 'package:ai_agent/llm/gemini_provider.dart';
 import 'package:ai_agent/llm/llm_types.dart';
 import 'package:ai_agent/llm/openai_provider.dart';
@@ -137,5 +138,31 @@ void main() {
     expect(res.text, isNull);
     expect(asInt(res.toolCalls.single.arguments['element_id']), 5);
     expect((res.providerRaw as List).length, 2);
+  });
+
+  test('도구가 없으면 모든 공급자가 tools 필드를 생략한다 (빈 배열은 API 오류)', () {
+    final msgs = [ChatMessage.user('분석해줘')];
+    final o = OpenAiProvider.buildBody(model: 'm', system: 's', messages: msgs, tools: const []);
+    expect(o.containsKey('tools'), isFalse);
+    expect(o.containsKey('tool_choice'), isFalse);
+    final a = AnthropicProvider.buildBody(
+      model: 'm',
+      maxTokens: 10,
+      system: 's',
+      messages: msgs,
+      tools: const [],
+    );
+    expect(a.containsKey('tools'), isFalse);
+    final g = GeminiProvider.buildBody(system: 's', messages: msgs, tools: const []);
+    expect(g.containsKey('tools'), isFalse);
+    final c = ChatGptCodexProvider.buildBody(
+      model: 'm',
+      system: 's',
+      messages: msgs,
+      tools: const [],
+    );
+    expect(c.containsKey('tools'), isFalse);
+    expect(c.containsKey('parallel_tool_calls'), isFalse);
+    expect(c['stream'], isTrue);
   });
 }

@@ -8,6 +8,7 @@ import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/gmail_api.dart';
 import '../google/google_auth.dart';
+import '../google/writing_style.dart';
 import '../ui/browser_screen.dart';
 import 'agent_models.dart';
 import 'agent_runner.dart';
@@ -19,12 +20,14 @@ class AgentController extends ChangeNotifier implements AgentHooks {
     required this.settings,
     required this.sessions,
     required this.google,
+    required this.writingStyle,
     required this.navigatorKey,
   });
 
   final SettingsStore settings;
   final SiteSessionStore sessions;
   final GoogleAuthService google;
+  final WritingStyleStore writingStyle;
   final GlobalKey<NavigatorState> navigatorKey;
 
   final AgentBrowser _browser = AgentBrowser();
@@ -61,9 +64,19 @@ class AgentController extends ChangeNotifier implements AgentHooks {
       systemPrompt: buildSystemPrompt(
         loginState: {for (final s in allSites) s: sessions.isLoggedIn(s)},
         gmailAccount: google.email,
+        styleGuide: writingStyle.profile?.guide,
       ),
     );
     await _run(task);
+  }
+
+  /// 보낸 메일함을 분석해 말투를 학습한다 (현재 선택된 LLM 사용).
+  Future<void> learnWritingStyle() async {
+    if (!google.isSignedIn || !settings.isConfigured) return;
+    await writingStyle.learn(
+      llm: settings.createProvider(),
+      gmail: GmailApi(authHeaders: google.authHeaders),
+    );
   }
 
   /// 같은 대화를 이어서 지시한다 (예: "두 번째 메일에 답장 써줘").

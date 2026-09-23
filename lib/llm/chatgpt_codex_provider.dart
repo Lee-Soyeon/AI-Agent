@@ -78,18 +78,20 @@ class ChatGptCodexProvider implements LlmProvider {
       'model': model,
       'instructions': system,
       'input': input,
-      'tools': [
-        for (final t in tools)
-          {
-            'type': 'function',
-            'name': t.name,
-            'description': t.description,
-            'parameters': t.parameters,
-            'strict': false,
-          },
-      ],
-      'tool_choice': 'auto',
-      'parallel_tool_calls': true,
+      if (tools.isNotEmpty) ...{
+        'tools': [
+          for (final t in tools)
+            {
+              'type': 'function',
+              'name': t.name,
+              'description': t.description,
+              'parameters': t.parameters,
+              'strict': false,
+            },
+        ],
+        'tool_choice': 'auto',
+        'parallel_tool_calls': true,
+      },
       'store': false,
       'stream': true,
     };

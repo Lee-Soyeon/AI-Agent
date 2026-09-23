@@ -56,14 +56,21 @@ class OpenAiProvider implements LlmProvider {
     return {
       'model': model,
       'messages': out,
-      'tools': [
-        for (final t in tools)
-          {
-            'type': 'function',
-            'function': {'name': t.name, 'description': t.description, 'parameters': t.parameters},
-          },
-      ],
-      'tool_choice': 'auto',
+      // 빈 tools 배열은 API 가 거부하므로 도구가 없으면 필드를 생략한다.
+      if (tools.isNotEmpty) ...{
+        'tools': [
+          for (final t in tools)
+            {
+              'type': 'function',
+              'function': {
+                'name': t.name,
+                'description': t.description,
+                'parameters': t.parameters,
+              },
+            },
+        ],
+        'tool_choice': 'auto',
+      },
     };
   }
 

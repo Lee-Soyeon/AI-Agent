@@ -78,10 +78,11 @@ class AnthropicProvider implements LlmProvider {
       'max_tokens': maxTokens,
       'system': system,
       'messages': out,
-      'tools': [
-        for (final t in tools)
-          {'name': t.name, 'description': t.description, 'input_schema': t.parameters},
-      ],
+      if (tools.isNotEmpty)
+        'tools': [
+          for (final t in tools)
+            {'name': t.name, 'description': t.description, 'input_schema': t.parameters},
+        ],
     };
   }
 

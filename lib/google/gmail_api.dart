@@ -156,6 +156,38 @@ class GmailApi {
     return [for (final m in metas) _summary(m)];
   }
 
+  /// 검색 결과의 메일 id 를 [max] 개까지 모은다 (여러 페이지를 넘겨 가며).
+  Future<List<String>> searchIds(String query, {int max = 50}) async {
+    final ids = <String>[];
+    String? pageToken;
+    do {
+      final list = await _request(
+        'GET',
+        '/messages',
+        query: {
+          'q': query,
+          'maxResults': '${(max - ids.length).clamp(1, 500)}',
+          'pageToken': ?pageToken,
+        },
+      );
+      for (final m in (list['messages'] as List? ?? const [])) {
+        ids.add((m as Map)['id'] as String);
+      }
+      pageToken = list['nextPageToken'] as String?;
+    } while (pageToken != null && ids.length < max);
+    return ids.take(max).toList();
+  }
+
+  /// 여러 메일을 동시에 [concurrency] 개씩 읽는다 (API 할당량 보호).
+  Future<List<GmailMessage>> readMany(List<String> ids, {int concurrency = 5}) async {
+    final out = <GmailMessage>[];
+    for (var i = 0; i < ids.length; i += concurrency) {
+      final batch = ids.skip(i).take(concurrency);
+      out.addAll(await Future.wait(batch.map(read)));
+    }
+    return out;
+  }
+
   GmailSummary _summary(Map<String, dynamic> m) {
     final headers = _headers(m['payload'] as Map?);
     return GmailSummary(

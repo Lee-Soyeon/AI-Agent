@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../browser/agent_browser.dart';
 import '../google/gmail_api.dart';
+import '../google/writing_style.dart';
 import '../llm/llm_types.dart';
 import 'agent_models.dart';
 import 'agent_tools.dart';
@@ -36,6 +37,9 @@ class AgentRunner {
   /// Google 계정이 연결되지 않았으면 null.
   final GmailApi? gmail;
   final String? gmailAddress;
+
+  /// 이번 대화에서 말투 예시를 확인했는지. 확인 전에는 gmail_send 를 막는다.
+  bool _styleChecked = false;
 
   final List<ChatMessage> messages = [];
   bool _cancelled = false;
@@ -287,9 +291,43 @@ class AgentRunner {
           );
           return _Outcome(text);
 
+        case AgentTools.gmailStyleExamples:
+          final api = gmail;
+          if (api == null) return _gmailNotConnected();
+          final recipient = '${a['recipient'] ?? ''}'.trim();
+          final extra = '${a['query'] ?? ''}'.trim();
+          var samples = await fetchSentSamples(
+            api,
+            max: 3,
+            query: [if (recipient.isNotEmpty) 'to:$recipient', extra].join(' '),
+          );
+          var note = recipient.isEmpty ? '최근 보낸 메일' : '$recipient 에게 보냈던 메일';
+          if (samples.isEmpty && recipient.isNotEmpty) {
+            samples = await fetchSentSamples(api, max: 3, query: extra);
+            note = '$recipient 에게 보낸 메일이 없어 최근 보낸 메일로 대신함';
+          }
+          _styleChecked = true;
+          final body = samples.isEmpty
+              ? '보낸 메일 예시가 없습니다. 시스템 프롬프트의 말투 가이드(있다면)를 따르세요.'
+              : [for (var i = 0; i < samples.length; i++) samples[i].toPrompt(i)].join('\n\n');
+          hooks.onLog(
+            AgentLogEntry(LogKind.observation, '말투 예시 ${samples.length}통 ($note)', detail: body),
+          );
+          return _Outcome(
+            '## 사용자가 실제로 보낸 메일 — $note\n'
+            '인사말·호칭·어미·문단 구성·맺음말·서명을 이 예시와 똑같이 따라 쓰세요.\n\n$body',
+          );
+
         case AgentTools.gmailSend:
           final api = gmail;
           if (api == null) return _gmailNotConnected();
+          if (!_styleChecked) {
+            _styleChecked = true; // 한 번만 막고, 다음 호출부터는 통과시킨다.
+            return _error(
+              '먼저 gmail_style_examples 로 사용자가 이 받는 사람에게 보냈던 메일을 확인하고, '
+              '그 말투와 형식에 맞춰 본문을 다시 쓴 뒤 gmail_send 를 호출하세요.',
+            );
+          }
           final email = OutgoingEmail(
             to: _stringList(a['to']),
             cc: _stringList(a['cc']),
@@ -393,6 +431,7 @@ class AgentRunner {
       AgentTools.gmailSearch => '📬 메일 검색: ${a['query']}',
       AgentTools.gmailRead => '📖 메일 읽기',
       AgentTools.gmailSend => '✉️ 메일 전송 준비: ${a['subject']}',
+      AgentTools.gmailStyleExamples => '🖋️ 내 말투 확인: ${a['recipient'] ?? '최근 메일'}',
       _ => '${c.name} $a',
     };
   }
