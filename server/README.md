@@ -26,6 +26,24 @@ docker run -d --name ai-agent --env-file .env -p 8000:8000 -v ai-agent-data:/dat
   토큰을 비밀번호처럼 관리하세요. 여러 사용자를 받으려면 사용자별 프로필·인증을 추가해야 합니다.
 - **세션 쿠키**: "로그인 상태 유지"를 체크하지 않은 로그인(만료일 없는 쿠키)은 서버 재시작 시 풀릴 수 있습니다.
 
+## 직접 실행 (Docker 없이, Mac)
+
+**Python 3.10 이상**이 필요합니다 (3.12 권장). conda/miniforge 를 쓰고 있다면 먼저 `conda deactivate`.
+
+```bash
+brew install python@3.12
+cd server
+python3.12 -m venv .venv && source .venv/bin/activate
+python --version                      # 3.12.x 인지 확인
+pip install -r requirements.txt
+python -m playwright install chromium
+cp .env.example .env                  # AGENT_TOKEN 과 LLM 키 입력
+set -a; source .env; set +a
+HEADLESS=0 DATA_DIR=./data python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+`python -m uvicorn` 으로 실행해야 가상환경의 uvicorn 이 쓰입니다. `HEADLESS=0` 이면 에이전트가 조작하는 크롬 창이 화면에 보입니다.
+
 ## API 요약
 
 | 메서드 | 경로 | 설명 |
