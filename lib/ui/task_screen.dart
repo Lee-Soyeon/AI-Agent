@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
+import 'app_theme.dart';
 import 'home_screen.dart' show statusLabel;
 
 class TaskScreen extends StatefulWidget {
@@ -90,7 +91,6 @@ class _TaskScreenState extends State<TaskScreen> {
                         maxLines: 4,
                         decoration: const InputDecoration(
                           hintText: '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
-                          border: OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
@@ -170,9 +170,9 @@ class _LogTile extends StatelessWidget {
       LogKind.thought => (Icons.psychology_alt, scheme.tertiary),
       LogKind.action => (Icons.touch_app, scheme.secondary),
       LogKind.observation => (Icons.visibility, scheme.outline),
-      LogKind.approval => (Icons.verified_user, Colors.orange),
+      LogKind.approval => (Icons.verified_user, AppTokens.of(context).warningInk),
       LogKind.error => (Icons.error_outline, scheme.error),
-      LogKind.result => (Icons.flag, Colors.green),
+      LogKind.result => (Icons.flag, scheme.primary),
     };
 
     final body = entry.kind == LogKind.result || entry.kind == LogKind.user
@@ -250,9 +250,10 @@ class _ApprovalCardState extends State<_ApprovalCard> {
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange, width: 2),
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(AppTokens.r),
+          border: Border.all(color: AppTokens.of(context).warningLine, width: 2),
+          boxShadow: AppTokens.shadowLg,
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -267,7 +268,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                         : r.kind == ApprovalKind.sendEmail
                         ? Icons.outgoing_mail
                         : Icons.warning_amber,
-                    color: Colors.orange,
+                    color: AppTokens.of(context).warningInk,
                   ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(r.title, style: Theme.of(context).textTheme.titleMedium)),
@@ -281,8 +282,8 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(8),
+                    color: scheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(AppTokens.rSm),
                   ),
                   child: SelectableText(r.details!),
                 ),
@@ -293,7 +294,6 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                 decoration: const InputDecoration(
                   hintText: '수정 요청 (선택) — 예: 수량을 2개로 / 더 공손하게',
                   isDense: true,
-                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -373,7 +373,6 @@ class _QuestionCardState extends State<_QuestionCard> {
                       decoration: const InputDecoration(
                         hintText: '직접 입력',
                         isDense: true,
-                        border: OutlineInputBorder(),
                       ),
                     ),
                   ),

@@ -9,6 +9,7 @@ import 'core/settings_store.dart';
 import 'google/google_auth.dart';
 import 'google/writing_style.dart';
 import 'openai/chatgpt_auth.dart';
+import 'ui/app_theme.dart';
 import 'ui/home_screen.dart';
 
 Future<void> main() async {
@@ -53,13 +54,12 @@ class AiAgentApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF5B5BD6);
     return MaterialApp(
       title: 'AI Agent',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
-      darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
       home: const HomeScreen(),
     );
   }

@@ -9,6 +9,7 @@ import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../openai/chatgpt_auth.dart';
+import 'app_theme.dart';
 import 'browser_screen.dart';
 import 'remote_browser_screen.dart';
 import 'settings_screen.dart';
@@ -129,11 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final site in allSites)
               Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: site.color,
-                    foregroundColor: Colors.white,
-                    child: Icon(site.icon),
-                  ),
+                  leading: CircleAvatar(child: Icon(site.icon)),
                   title: Text(site.name),
                   subtitle: Text(sessions.isLoggedIn(site) ? '로그인됨' : '로그인이 필요합니다'),
                   trailing: sessions.isLoggedIn(site)
@@ -156,7 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
             minLines: 3,
             maxLines: 6,
             decoration: const InputDecoration(
-              border: OutlineInputBorder(),
               hintText: '예) 쿠팡에서 휴지 30롤 담아줘',
             ),
           ),
@@ -288,11 +284,7 @@ class _GmailCard extends StatelessWidget {
       child: Column(
         children: [
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF1A73E8),
-              foregroundColor: Colors.white,
-              child: Icon(Icons.mail),
-            ),
+            leading: const CircleAvatar(child: Icon(Icons.mail)),
             title: const Text('Gmail'),
             subtitle: Text(
               google.isSignedIn ? '${google.email} · Gmail API 연결됨' : 'Google 계정 연결이 필요합니다',
@@ -353,10 +345,10 @@ class _ActiveTaskBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.of(context);
     final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
     return Card(
-      color: needsYou ? scheme.errorContainer : scheme.primaryContainer,
+      color: needsYou ? t.warningBg : t.accentSoft,
       child: ListTile(
         leading: agent.isBusy && !needsYou
             ? const SizedBox(

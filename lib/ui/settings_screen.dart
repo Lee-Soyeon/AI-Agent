@@ -126,7 +126,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: const InputDecoration(
                 labelText: '서버 주소',
                 hintText: 'https://agent.example.com',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
@@ -137,7 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               enableSuggestions: false,
               decoration: const InputDecoration(
                 labelText: '서버 토큰 (AGENT_TOKEN)',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
@@ -184,7 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 enableSuggestions: false,
                 decoration: InputDecoration(
                   labelText: 'API 키',
-                  border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(
@@ -200,7 +197,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: InputDecoration(
                 labelText: '모델',
                 helperText: '기본값: ${v.defaultModel}',
-                border: const OutlineInputBorder(),
               ),
             ),
             if (v == LlmVendor.anthropic) ...[
@@ -211,7 +207,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: const InputDecoration(
                   labelText: '워크스페이스 ID (선택)',
                   helperText: '"not scoped to a workspace" 오류가 날 때만 입력 (wrkspc_…)',
-                  border: OutlineInputBorder(),
                 ),
               ),
             ],
@@ -223,7 +218,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: const InputDecoration(
               labelText: '작업당 최대 단계 수',
               helperText: '에이전트가 무한히 돌지 않도록 제한합니다',
-              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
