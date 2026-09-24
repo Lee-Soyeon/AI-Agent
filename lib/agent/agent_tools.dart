@@ -13,6 +13,7 @@ class AgentTools {
   static const requestUserHelp = 'request_user_help';
   static const finish = 'finish';
   static const serviceInfo = 'service_info';
+  static const handoffPayment = 'handoff_payment';
   static const gmailSearch = 'gmail_search';
   static const gmailRead = 'gmail_read';
   static const gmailSend = 'gmail_send';
@@ -104,6 +105,22 @@ class AgentTools {
           'details': {'type': 'string', 'description': '이메일 본문 전체, 상품 목록 등 상세 내용'},
         },
         'required': ['kind', 'title', 'summary'],
+      },
+    ),
+    const ToolSpec(
+      name: handoffPayment,
+      description:
+          '구매·예매·예약 결제를 사용자에게 넘긴다. 결제하기 버튼은 직접 누르지 말고, 주문서(상품·옵션·수량·배송지·'
+          '결제수단)를 모두 준비한 결제 직전 화면에서 호출하라. 사용자가 요약을 확인하고 같은 화면에서 직접 결제'
+          '(결제 비밀번호·카드 인증 포함)를 마친다. 결제가 끝나면 완료 페이지 스냅샷이 돌아온다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'title': {'type': 'string', 'description': '예: "쿠팡 결제: 코카콜라 제로 24캔"'},
+          'summary': {'type': 'string', 'description': '상품·옵션·수량·단가·총 결제금액·배송지·결제수단 (여러 줄)'},
+          'details': {'type': 'string', 'description': '추가 정보 (쿠폰·배송 예정일 등, 선택)'},
+        },
+        'required': ['title', 'summary'],
       },
     ),
     const ToolSpec(

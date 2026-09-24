@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -10,11 +10,24 @@ import '../remote/agent_server_client.dart';
 /// 서버 브라우저 화면을 실시간으로 보고 직접 조작하는 화면.
 /// 로그인, 캡차, 인증번호, 결제 비밀번호처럼 사용자가 해야 하는 일에 쓴다.
 class RemoteBrowserScreen extends StatefulWidget {
-  const RemoteBrowserScreen({super.key, required this.client, required this.title, this.message});
+  const RemoteBrowserScreen({
+    super.key,
+    required this.client,
+    required this.title,
+    this.message,
+    this.paymentMode = false,
+    this.closeSignal,
+  });
 
   final AgentServerClient client;
   final String title;
   final String? message;
+
+  /// 결제 모드: [완료]를 누르면 결제를 마쳤는지 묻고 true/false 로 닫힌다.
+  final bool paymentMode;
+
+  /// true 가 되면 스스로 닫힌다 (서버가 결제 완료를 감지한 경우).
+  final ValueListenable<bool>? closeSignal;
 
   @override
   State<RemoteBrowserScreen> createState() => _RemoteBrowserScreenState();
@@ -35,6 +48,30 @@ class _RemoteBrowserScreenState extends State<RemoteBrowserScreen> {
   void initState() {
     super.initState();
     _connect();
+    widget.closeSignal?.addListener(_onCloseSignal);
+  }
+
+  void _onCloseSignal() {
+    if (widget.closeSignal!.value && mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _done() async {
+    if (!widget.paymentMode) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final completed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('결제를 마쳤나요?'),
+        content: const Text('결제를 마쳤다면 에이전트가 주문 내역을 확인하고 마무리합니다.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('결제 안 함')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('결제 완료')),
+        ],
+      ),
+    );
+    if (completed != null && mounted) Navigator.of(context).pop(completed);
   }
 
   void _connect() {
@@ -70,6 +107,7 @@ class _RemoteBrowserScreenState extends State<RemoteBrowserScreen> {
 
   @override
   void dispose() {
+    widget.closeSignal?.removeListener(_onCloseSignal);
     _sub?.cancel();
     _channel?.sink.close();
     _text.dispose();
@@ -125,7 +163,7 @@ class _RemoteBrowserScreenState extends State<RemoteBrowserScreen> {
           ),
           IconButton(tooltip: '주소 열기', icon: const Icon(Icons.public), onPressed: _openUrl),
           FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _done,
             icon: const Icon(Icons.check),
             label: const Text('완료'),
           ),

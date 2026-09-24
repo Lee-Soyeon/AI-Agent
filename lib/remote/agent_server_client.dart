@@ -61,6 +61,18 @@ class AgentServerClient {
   Future<void> approve(String id, bool approved, {String? feedback}) =>
       _send('POST', '/tasks/$id/approval', {'approved': approved, 'feedback': feedback});
 
+  /// 결제 넘기기 결과 (approved=false 면 승인 카드에서 거절).
+  Future<void> payment(
+    String id, {
+    required bool approved,
+    bool completed = false,
+    String? feedback,
+  }) => _send('POST', '/tasks/$id/payment', {
+    'approved': approved,
+    'completed': completed,
+    'feedback': feedback,
+  });
+
   Future<void> answer(String id, String text) => _send('POST', '/tasks/$id/answer', {'text': text});
 
   Future<void> helpDone(String id) => _send('POST', '/tasks/$id/help_done');

@@ -28,6 +28,7 @@ SNAPSHOT_JS = _js("snapshot")
 DESCRIBE_JS = _js("describe")
 TYPE_TEXT_JS = _js("type_text")
 SCROLL_JS = _js("scroll")
+PAYMENT_DONE_JS = _js("payment_done")
 
 
 class BrowserError(Exception):
@@ -213,6 +214,13 @@ class BrowserManager:
             return await self.page.screenshot(type="jpeg", quality=60)
         except Exception:  # noqa: BLE001
             return None
+
+    async def payment_done(self) -> bool:
+        """지금 탭이 주문·결제 완료 페이지인지."""
+        try:
+            return bool(await self.page.evaluate(PAYMENT_DONE_JS))
+        except Exception:  # noqa: BLE001 - 페이지 이동 중
+            return False
 
     async def current_url(self) -> str:
         return self.page.url

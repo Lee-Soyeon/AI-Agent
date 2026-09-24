@@ -31,9 +31,18 @@ enum ApprovalKind {
 }
 
 class ApprovalRequest {
-  ApprovalRequest({required this.kind, required this.title, required this.summary, this.details});
+  ApprovalRequest({
+    required this.kind,
+    required this.title,
+    required this.summary,
+    this.details,
+    this.handoff = false,
+  });
 
   final ApprovalKind kind;
+
+  /// true 면 승인 후 에이전트가 버튼을 누르는 게 아니라, 준비된 결제 화면을 사용자에게 넘긴다.
+  final bool handoff;
   final String title;
   final String summary;
   final String? details;
@@ -46,6 +55,21 @@ class ApprovalDecision {
   final bool approved;
 
   /// 거절하면서 남긴 수정 요청 (예: "본문을 더 공손하게").
+  final String? feedback;
+}
+
+/// 결제 넘기기 결과.
+class PaymentOutcome {
+  const PaymentOutcome({required this.approved, this.completed = false, this.url, this.feedback});
+
+  /// 승인 카드에서 "결제하러 가기"를 눌렀는지.
+  final bool approved;
+
+  /// 사용자가 결제를 끝까지 마쳤는지 (완료 페이지 자동 감지 또는 "결제 완료" 확인).
+  final bool completed;
+
+  /// 결제 화면을 닫을 때의 페이지 (에이전트가 이어서 확인).
+  final String? url;
   final String? feedback;
 }
 
@@ -64,6 +88,9 @@ abstract class AgentHooks {
   void onScreenshot(List<int> jpeg);
   Future<ApprovalDecision> requestApproval(ApprovalRequest request);
   Future<String> askUser(UserQuestion question);
+
+  /// 결제 직전 화면을 사용자에게 넘긴다: 승인 카드 → 결제 화면(같은 세션) → 완료 감지.
+  Future<PaymentOutcome> requestPaymentHandoff(ApprovalRequest request);
 
   /// 보이는 브라우저를 열어 사용자가 직접 처리하게 한다(로그인, 캡차, 결제 비밀번호 등).
   /// 사용자가 마친 뒤의 URL 을 돌려준다.

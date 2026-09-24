@@ -226,6 +226,16 @@ class AgentBrowser implements BrowserDriver {
     await Future<void>.delayed(extra ?? const Duration(milliseconds: 900));
   }
 
+  /// 결제처럼 사용자가 직접 해야 할 때, 지금 페이지 상태를 그대로 화면에 띄우기 위해 넘겨준다.
+  /// 넘긴 뒤에는 이 브라우저가 초기화되며, 다음 동작 때 새 헤드리스 웹뷰를 만든다 (쿠키는 공유되어 로그인 유지).
+  HeadlessInAppWebView? takeOverForDisplay() {
+    final h = _headless;
+    if (h == null || !h.isRunning()) return null;
+    _headless = null;
+    _controller = null;
+    return h;
+  }
+
   Future<void> dispose() async {
     await _headless?.dispose();
     _headless = null;

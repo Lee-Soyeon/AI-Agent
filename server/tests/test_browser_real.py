@@ -20,13 +20,17 @@ PAGE = """<!doctype html><meta charset=utf-8><title>테스트</title>
 <input type=password name=pw>
 <a href="/other.html" target="_blank">새 탭 열기</a>
 <div role=button aria-label="결제하기" onclick="document.title='paid'">$</div>
-<div style="display:none"><button>숨김</button></div>"""
+<div style="display:none"><button>숨김</button></div>
+<input name=cardNo placeholder="카드번호 16자리"><input autocomplete=cc-csc aria-label="보안코드">"""
 
 
 @pytest.fixture
 def site(tmp_path: Path):
     (tmp_path / "index.html").write_text(PAGE, encoding="utf-8")
     (tmp_path / "other.html").write_text("<title>다른 탭</title><p>두번째", encoding="utf-8")
+    (tmp_path / "order-complete.html").write_text(
+        "<meta charset=utf-8><title>쿠팡</title><h2>주문이 완료되었습니다</h2><p>주문번호 123", encoding="utf-8"
+    )
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(tmp_path)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_port}"
@@ -47,6 +51,10 @@ async def test_real_browser_end_to_end(site, tmp_path):
 
         assert (await b.describe(labels["결제하기"]))["label"].startswith("결제하기")
         assert (await b.describe(labels["pw"]))["type"] == "password"
+        assert (await b.describe(labels["카드번호 16자리"]))["paymentField"] is True
+        assert (await b.describe(labels["보안코드"]))["paymentField"] is True
+        assert (await b.describe(labels["검색어"]))["paymentField"] is False
+        assert await b.payment_done() is False
 
         assert (await b.type_text(labels["검색어"], "생수", submit=True))["ok"]
         assert await b.page.title() == "submitted:생수"
@@ -81,6 +89,9 @@ async def test_real_browser_end_to_end(site, tmp_path):
                 break
             await asyncio.sleep(0.1)
         assert b.page.url.endswith("/other.html")
+
+        await b.navigate(f"{site}/order-complete.html")
+        assert await b.payment_done() is True
 
         # 만료일이 있는 로그인 쿠키("로그인 유지")는 프로필에 남아 재시작 후에도 유지된다.
         # (만료일 없는 세션 쿠키는 크롬 특성상 재시작하면 사라진다)

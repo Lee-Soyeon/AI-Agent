@@ -23,7 +23,8 @@ InAppWebViewSettings buildWebSettings() => InAppWebViewSettings(
   sharedCookiesEnabled: true,
   // 새 창(target=_blank, window.open)을 같은 웹뷰에서 열어 에이전트가 놓치지 않도록 한다.
   supportMultipleWindows: false,
-  javaScriptCanOpenWindowsAutomatically: false,
+  // 결제창(안심결제·ISP)은 스크립트로 새 창을 연다. 막으면 결제 버튼이 반응하지 않는다.
+  javaScriptCanOpenWindowsAutomatically: true,
   mediaPlaybackRequiresUserGesture: true,
   useShouldOverrideUrlLoading: false,
   isInspectable: true,
