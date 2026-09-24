@@ -118,6 +118,14 @@ class GoogleAuthService extends ChangeNotifier {
   }
 
   static String _describe(Object e) {
+    // 클라이언트 ID 를 아직 설정하지 않은 경우 (iOS: GIDClientID 비어 있음, Android: serverClientId 없음)
+    if (RegExp(
+      r'clientID|serverClientId|No active configuration',
+      caseSensitive: false,
+    ).hasMatch('$e')) {
+      return 'Gmail 연결을 쓰려면 Google OAuth 클라이언트 ID 설정이 필요합니다 '
+          '(README 의 "Gmail(Google 로그인) 설정"). 서버 모드에서는 필요 없습니다.';
+    }
     if (e is GoogleSignInException) {
       if (e.code == GoogleSignInExceptionCode.clientConfigurationError) {
         return 'Google 로그인 설정 오류: OAuth 클라이언트 ID 를 확인하세요. (${e.description ?? ''})';
