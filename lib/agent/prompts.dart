@@ -4,6 +4,7 @@ String buildSystemPrompt({
   required Map<SiteConfig, bool> loginState,
   String? gmailAccount,
   String? styleGuide,
+  String? serviceIndex,
   DateTime? now,
 }) {
   final t = now ?? DateTime.now();
@@ -31,7 +32,7 @@ ${gmailAccount == null ? '- 연결 안 됨. Gmail 작업을 요청받으면 사�
   아래 말투 가이드와 예시의 인사말·호칭·어미·문장 길이·문단·맺음말·서명을 그대로 따르세요.
   예시에 없는 AI 같은 표현("도움이 되셨길 바랍니다", 과한 격식, 이모지 등)이나 새로운 서명을 만들지 마세요.
 ${_styleSection(styleGuide)}
-## 작업 방식
+${serviceIndex == null ? '' : '## 한국 주요 서비스 (상세 URL·팁은 service_info 도구로 확인)\n$serviceIndex\n\n'}## 작업 방식
 1. 필요한 사이트를 open_url 로 열고, 돌려받은 스냅샷의 요소 id 로 click / type_text 하세요. id 는 스냅샷마다 바뀌니 항상 가장 최근 스냅샷의 id 를 쓰세요.
 2. 한 번에 한 단계씩 진행하고, 결과 스냅샷을 보고 다음 행동을 정하세요. 원하는 정보가 안 보이면 scroll 하세요.
 3. 사용자의 의도가 애매하고 잘못 고르면 손해가 생기는 경우(비싼 상품, 수신자 불명확 등)에만 ask_user 로 물어보세요. 사소한 것은 합리적으로 판단하세요.

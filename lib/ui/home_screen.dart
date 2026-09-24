@@ -9,8 +9,10 @@ import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../openai/chatgpt_auth.dart';
+import '../services/service_catalog.dart';
 import 'browser_screen.dart';
 import 'remote_browser_screen.dart';
+import 'services_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
 import 'writing_style_screen.dart';
@@ -21,6 +23,10 @@ const _examples = [
   'Gmail 에서 안 읽은 메일 5개 요약해줘',
   'Gmail 에서 가장 최근 메일에 "확인했습니다, 감사합니다" 라고 답장 써서 승인 받고 보내줘',
   '안 읽은 메일 중 답장이 필요한 것에 평소 내 말투로 답장 초안 써줘',
+  '이번 주 토요일 저녁 7시 강남역 근처 4인 파스타집 네이버 예약 가능한 곳 찾아줘',
+  '다음 주 금요일 서울→부산 KTX 오후 6시 이후 좌석 있는지 봐줘',
+  '오늘 CGV 용산 저녁 상영시간표 알려줘',
+  'G마켓·11번가·쿠팡에서 에어팟 프로 최저가 비교해줘',
 ];
 
 class HomeScreen extends StatefulWidget {
@@ -148,6 +154,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
           if (!settings.runOnServer) _GmailCard(google: google),
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.apps)),
+              title: const Text('한국 주요 서비스'),
+              subtitle: Text(
+                '브라우저로 되는 ${context.read<ServiceCatalog>().supported.length}개 서비스 — 탭해서 로그인',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
+            ),
+          ),
           const SizedBox(height: 16),
           Text('무엇을 해드릴까요?', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
