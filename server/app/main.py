@@ -34,6 +34,12 @@ class ApprovalIn(BaseModel):
     feedback: str | None = None
 
 
+class PaymentIn(BaseModel):
+    approved: bool
+    completed: bool = False
+    feedback: str | None = None
+
+
 class AnswerIn(BaseModel):
     text: str
 
@@ -144,6 +150,12 @@ def create_app(
             raise HTTPException(409, "승인을 기다리는 중이 아닙니다.")
         return {"ok": True}
 
+    @app.post("/tasks/{task_id}/payment", dependencies=[Depends(auth)])
+    async def payment(task_id: str, body: PaymentIn) -> dict[str, Any]:
+        if not get_task(task_id).resolve("payment", body.model_dump()):
+            raise HTTPException(409, "결제를 기다리는 중이 아닙니다.")
+        return {"ok": True}
+
     @app.post("/tasks/{task_id}/answer", dependencies=[Depends(auth)])
     async def answer(task_id: str, body: AnswerIn) -> dict[str, Any]:
         if not get_task(task_id).resolve("question", body.text):
@@ -192,7 +204,7 @@ def create_app(
     @app.post("/browser/open", dependencies=[Depends(auth)])
     async def open_url(body: OpenIn) -> dict[str, Any]:
         """사용자가 로그인하려고 사이트를 열 때 (에이전트 작업 중에는 불가)."""
-        if busy() and not (state["current"].pending and state["current"].pending.type == "help"):
+        if busy() and not (state["current"].pending and state["current"].pending.type in ("help", "payment")):
             raise HTTPException(409, "에이전트가 브라우저를 쓰는 중입니다.")
         await state["browser"].navigate(body.url)
         return {"ok": True, "url": await state["browser"].current_url()}

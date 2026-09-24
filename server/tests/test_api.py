@@ -161,3 +161,20 @@ def test_interrupted_task_is_marked_failed_and_history_repaired(tmp_path):
     assert "재시작" in loaded.logs[-1].text
     assert [m.role for m in loaded.messages] == ["user", "assistant", "tool"]
     assert loaded.messages[-1].tool_call_id == "x"
+
+
+def test_payment_endpoint():
+    llm = ScriptedLlm([
+        call("handoff_payment", {"title": "결제", "summary": "9,900원"}, "a"),
+        call("finish", {"summary": "주문 완료"}, "b"),
+    ])
+    with TestClient(make(llm)) as c:
+        t = c.post("/tasks", json={"prompt": "사줘"}, headers=AUTH).json()
+        data = wait(c, t["id"], lambda d: d["pending"] and d["pending"]["type"] == "payment")
+        assert data["pending"]["summary"] == "9,900원"
+        # 결제 중에는 사용자가 서버 브라우저에서 다른 주소를 열 수 있다
+        assert c.post("/browser/open", json={"url": "https://m.coupang.com"}, headers=AUTH).status_code == 200
+        assert c.post(f"/tasks/{t['id']}/approval", json={"approved": True}, headers=AUTH).status_code == 409
+        r = c.post(f"/tasks/{t['id']}/payment", json={"approved": True, "completed": True}, headers=AUTH)
+        assert r.json() == {"ok": True}
+        assert wait(c, t["id"], lambda d: d["status"] == "finished")["result"] == "주문 완료"

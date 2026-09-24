@@ -224,6 +224,12 @@ class AgentRunner {
           final submit = a['submit'] == true;
           final d = await browser.describe(id);
           if (d['ok'] != true) return _error('id $id 요소를 찾을 수 없습니다. read_page 로 최신 id 를 확인하세요.');
+          if (d['paymentField'] == true) {
+            return _error(
+              '카드번호·CVC·유효기간·결제 비밀번호 칸에는 입력할 수 없습니다. '
+              '등록된 결제수단을 고르고, 결제 직전 화면에서 handoff_payment 로 사용자에게 넘기세요.',
+            );
+          }
           if (d['type'] == 'password') {
             return _error('비밀번호 입력창에는 입력할 수 없습니다. request_user_help 로 사용자에게 로그인을 요청하세요.');
           }
@@ -276,6 +282,43 @@ class AgentRunner {
                 ? '거절됨. 해당 동작을 하지 말고, 지금까지의 상황을 finish 로 보고하세요.'
                 : '거절됨. 사용자 의견: "$fb". 의견을 반영해 수정한 뒤 다시 request_approval 하세요.',
           );
+
+        case AgentTools.handoffPayment:
+          final req = ApprovalRequest(
+            kind: ApprovalKind.purchase,
+            title: '${a['title'] ?? '결제'}',
+            summary: '${a['summary'] ?? ''}',
+            details: a['details']?.toString(),
+            handoff: true,
+          );
+          hooks.onStatus(AgentStatus.waitingApproval);
+          final out = await hooks.requestPaymentHandoff(req);
+          hooks.onStatus(AgentStatus.running);
+          final fb = out.feedback?.trim() ?? '';
+          if (!out.approved) {
+            hooks.onLog(
+              AgentLogEntry(LogKind.approval, '❌ 결제를 거절했습니다${fb.isEmpty ? '' : ': $fb'}'),
+            );
+            return _Outcome(
+              fb.isEmpty
+                  ? '사용자가 결제를 거절했습니다. 결제하지 말고 finish 로 보고하세요.'
+                  : '사용자가 결제 전에 수정을 요청했습니다: "$fb". 반영한 뒤 다시 handoff_payment 하세요.',
+            );
+          }
+          final url = out.url;
+          if (url != null && url.startsWith('http')) await browser.navigate(url);
+          hooks.onLog(
+            AgentLogEntry(
+              LogKind.approval,
+              out.completed ? '✅ 사용자가 결제를 마쳤습니다' : '결제 화면을 닫았습니다 (결제 미완료)',
+            ),
+          );
+          final msg = out.completed
+              ? '사용자가 결제를 마쳤습니다. 이 페이지에서 주문번호·결제금액을 확인해 finish 로 보고하세요.'
+              : '사용자가 결제를 마치지 않고 화면을 닫았습니다${fb.isEmpty ? '' : ' ($fb)'}. '
+                    '다시 시도할지 ask_user 로 묻거나 finish 로 보고하세요.';
+          if (url == null || !url.startsWith('http')) return _Outcome(msg);
+          return await _observe(msg);
 
         case AgentTools.askUser:
           final q = UserQuestion(
@@ -478,6 +521,7 @@ class AgentRunner {
       AgentTools.requestUserHelp => '🧑 사용자 도움 요청: ${a['reason']}',
       AgentTools.finish => '🏁 완료',
       AgentTools.serviceInfo => '📇 서비스 정보: ${a['service']}',
+      AgentTools.handoffPayment => '💳 결제 넘기기: ${a['title']}',
       AgentTools.gmailSearch => '📬 메일 검색: ${a['query']}',
       AgentTools.gmailRead => '📖 메일 읽기',
       AgentTools.gmailSend => '✉️ 메일 전송 준비: ${a['subject']}',

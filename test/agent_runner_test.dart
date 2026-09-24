@@ -31,11 +31,12 @@ class _ScriptedLlm implements LlmProvider {
 }
 
 class _FakeBrowser implements BrowserDriver {
-  final labels = {1: '장바구니 담기', 2: '결제하기', 3: '비밀번호'};
+  final labels = {1: '장바구니 담기', 2: '결제하기', 3: '비밀번호', 4: '카드번호'};
   final clicked = <int>[];
+  final visited = <String>[];
 
   @override
-  Future<void> navigate(String url) async {}
+  Future<void> navigate(String url) async => visited.add(url);
   @override
   Future<String?> currentUrl() async => 'https://m.coupang.com/';
   @override
@@ -52,6 +53,7 @@ class _FakeBrowser implements BrowserDriver {
     'ok': labels.containsKey(id),
     'label': labels[id],
     'type': id == 3 ? 'password' : '',
+    'paymentField': id == 4,
   };
   @override
   Future<Map<String, dynamic>> click(int id) async {
@@ -72,8 +74,10 @@ class _FakeBrowser implements BrowserDriver {
 }
 
 class _Hooks implements AgentHooks {
-  _Hooks({this.approve = true});
+  _Hooks({this.approve = true, this.payment});
   final bool approve;
+  final PaymentOutcome? payment;
+  ApprovalRequest? lastPayment;
   final logs = <AgentLogEntry>[];
   int approvals = 0;
   ApprovalRequest? lastApproval;
@@ -89,6 +93,12 @@ class _Hooks implements AgentHooks {
     approvals++;
     lastApproval = request;
     return ApprovalDecision(approved: approve, feedback: approve ? null : '다른 상품으로');
+  }
+
+  @override
+  Future<PaymentOutcome> requestPaymentHandoff(ApprovalRequest request) async {
+    lastPayment = request;
+    return payment ?? const PaymentOutcome(approved: false);
   }
 
   @override
@@ -370,6 +380,72 @@ void main() {
         systemPrompt: 's',
       ).run('보내');
       expect(_lastToolResult(llm2.seen[1]), contains('연결되어 있지 않습니다'));
+    });
+  });
+
+  group('결제 넘기기 (handoff_payment)', () {
+    LlmResponse handoff() => _call('handoff_payment', {
+      'title': '쿠팡 결제: 코카콜라 제로 24캔',
+      'summary': '코카콜라 제로 355ml x24 · 19,800원 · 쿠페이',
+    }, 'h');
+
+    test('사용자가 결제를 마치면 완료 페이지로 이동해 확인하고, 에이전트는 결제 버튼을 누르지 않는다', () async {
+      final llm = _ScriptedLlm([handoff(), const LlmResponse(text: '주문 완료')]);
+      final browser = _FakeBrowser();
+      final hooks = _Hooks(
+        payment: const PaymentOutcome(
+          approved: true,
+          completed: true,
+          url: 'https://checkout.coupang.com/orderComplete',
+        ),
+      );
+      await AgentRunner(llm: llm, browser: browser, hooks: hooks, systemPrompt: 's').run('콜라 사줘');
+
+      expect(hooks.lastPayment!.handoff, isTrue);
+      expect(hooks.lastPayment!.summary, contains('19,800원'));
+      expect(browser.visited, ['https://checkout.coupang.com/orderComplete']);
+      expect(browser.clicked, isEmpty);
+      expect(_lastToolResult(llm.seen[1]), contains('결제를 마쳤습니다'));
+      expect(_lastToolResult(llm.seen[1]), contains(AgentRunner.snapshotHeader));
+    });
+
+    test('결제 전 수정 요청은 에이전트에게 전달된다', () async {
+      final llm = _ScriptedLlm([handoff(), const LlmResponse(text: '수정')]);
+      await AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: _Hooks(payment: const PaymentOutcome(approved: false, feedback: '12캔으로')),
+        systemPrompt: 's',
+      ).run('x');
+      expect(_lastToolResult(llm.seen[1]), contains('12캔으로'));
+    });
+
+    test('결제 화면을 닫고 결제하지 않으면 그렇게 알린다', () async {
+      final llm = _ScriptedLlm([handoff(), const LlmResponse(text: '끝')]);
+      await AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: _Hooks(
+          payment: const PaymentOutcome(approved: true, url: 'https://checkout.coupang.com/x'),
+        ),
+        systemPrompt: 's',
+      ).run('x');
+      expect(_lastToolResult(llm.seen[1]), contains('결제를 마치지 않고'));
+    });
+
+    test('카드번호 등 결제 정보 칸에는 입력할 수 없다', () async {
+      final llm = _ScriptedLlm([
+        _call('type_text', {'element_id': 4, 'text': '1234-5678'}),
+        const LlmResponse(text: '끝'),
+      ]);
+      await AgentRunner(
+        llm: llm,
+        browser: _FakeBrowser(),
+        hooks: _Hooks(),
+        systemPrompt: 's',
+      ).run('x');
+      expect(_lastToolResult(llm.seen[1]), contains('카드번호'));
+      expect(_lastToolResult(llm.seen[1]), contains('handoff_payment'));
     });
   });
 }

@@ -37,6 +37,9 @@ class _Hooks implements AgentHooks {
   Future<ApprovalDecision> requestApproval(ApprovalRequest request) async =>
       const ApprovalDecision(approved: false);
   @override
+  Future<PaymentOutcome> requestPaymentHandoff(ApprovalRequest request) async =>
+      const PaymentOutcome(approved: false);
+  @override
   Future<String> askUser(UserQuestion question) async => '';
   @override
   Future<String?> requestUserHelp(String reason, String? url) async => url;
