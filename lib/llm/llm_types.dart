@@ -17,6 +17,14 @@ class ToolCall {
   final String id;
   final String name;
   final Map<String, dynamic> arguments;
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'arguments': arguments};
+
+  factory ToolCall.fromJson(Map<String, dynamic> j) => ToolCall(
+    id: '${j['id']}',
+    name: '${j['name']}',
+    arguments: (j['arguments'] as Map?)?.cast<String, dynamic>() ?? const {},
+  );
 }
 
 enum ChatRole { user, assistant, tool }
@@ -67,6 +75,37 @@ class ChatMessage {
     toolCallId: toolCallId,
     toolName: toolName,
     providerRaw: providerRaw,
+  );
+
+  /// 다른 공급자로 대화를 이어갈 때는 원본 응답을 버린다 (형식이 달라 그대로 보낼 수 없다).
+  ChatMessage withoutProviderRaw() => ChatMessage._(
+    role: role,
+    text: text,
+    toolCalls: toolCalls,
+    toolCallId: toolCallId,
+    toolName: toolName,
+  );
+
+  /// 대화 기록 저장용. [providerRaw] 는 공급자 응답에서 온 JSON 이라 그대로 저장한다.
+  Map<String, dynamic> toJson() => {
+    'role': role.name,
+    if (text != null) 'text': text,
+    if (toolCalls.isNotEmpty) 'toolCalls': [for (final c in toolCalls) c.toJson()],
+    if (toolCallId != null) 'toolCallId': toolCallId,
+    if (toolName != null) 'toolName': toolName,
+    if (providerRaw != null) 'providerRaw': providerRaw,
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage._(
+    role: ChatRole.values.asNameMap()[j['role']] ?? ChatRole.user,
+    text: j['text'] as String?,
+    toolCalls: [
+      for (final c in (j['toolCalls'] as List? ?? const []))
+        ToolCall.fromJson((c as Map).cast<String, dynamic>()),
+    ],
+    toolCallId: j['toolCallId'] as String?,
+    toolName: j['toolName'] as String?,
+    providerRaw: j['providerRaw'],
   );
 }
 

@@ -20,11 +20,11 @@ class AgentServerClient {
 
   Future<Map<String, dynamic>?> _send(String method, String path, [Object? body]) async {
     final uri = Uri.parse('$baseUrl$path');
-    final res =
-        await (method == 'GET'
-                ? _client.get(uri, headers: _headers)
-                : _client.post(uri, headers: _headers, body: jsonEncode(body ?? {})))
-            .timeout(const Duration(seconds: 30));
+    final res = await switch (method) {
+      'GET' => _client.get(uri, headers: _headers),
+      'DELETE' => _client.delete(uri, headers: _headers),
+      _ => _client.post(uri, headers: _headers, body: jsonEncode(body ?? {})),
+    }.timeout(const Duration(seconds: 30));
     final text = utf8.decode(res.bodyBytes);
     if (res.statusCode == 401) throw AgentServerException('서버 토큰이 올바르지 않습니다.', 401);
     if (res.statusCode >= 300) {
@@ -38,6 +38,16 @@ class AgentServerClient {
     return decoded is Map ? decoded.cast<String, dynamic>() : null;
   }
 
+  Future<List<dynamic>> _getList(String path) async {
+    final res = await _client
+        .get(Uri.parse('$baseUrl$path'), headers: _headers)
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode == 401) throw AgentServerException('서버 토큰이 올바르지 않습니다.', 401);
+    if (res.statusCode >= 300) throw AgentServerException('목록을 불러오지 못했습니다.', res.statusCode);
+    final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+    return decoded is List ? decoded : const [];
+  }
+
   /// 연결 테스트: 서버가 살아 있고 토큰이 맞는지.
   Future<void> ping() async {
     final res = await _client
@@ -49,6 +59,13 @@ class AgentServerClient {
 
   Future<RemoteTask> createTask(String prompt) async =>
       RemoteTask(await _send('POST', '/tasks', {'prompt': prompt}) ?? const {});
+
+  /// 서버에 남아 있는 작업(대화) 목록, 최근 순. 로그는 들어 있지 않다.
+  Future<List<RemoteTask>> listTasks() async => [
+    for (final t in await _getList('/tasks')) RemoteTask((t as Map).cast<String, dynamic>()),
+  ];
+
+  Future<void> deleteTask(String id) => _send('DELETE', '/tasks/$id');
 
   Future<RemoteTask?> current() async {
     final j = await _send('GET', '/tasks/current');
@@ -95,7 +112,9 @@ class RemoteTask {
   final Map<String, dynamic> json;
 
   String get id => json['id'] as String;
+  String get prompt => json['prompt'] as String? ?? '';
   String get status => json['status'] as String? ?? 'running';
+  bool get isBusy => const {'running', 'waiting_approval', 'waiting_user'}.contains(status);
   List<Map<String, dynamic>> get logs => [
     for (final l in (json['logs'] as List? ?? const [])) (l as Map).cast<String, dynamic>(),
   ];

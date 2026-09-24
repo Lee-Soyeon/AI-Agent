@@ -3,10 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
+import '../agent/chat_session.dart';
 import 'home_screen.dart' show statusLabel;
 
 class TaskScreen extends StatefulWidget {
-  const TaskScreen({super.key});
+  /// [sessionId] 가 없으면 지금 열린 대화를 보여준다.
+  const TaskScreen({super.key, this.sessionId});
+
+  final String? sessionId;
 
   @override
   State<TaskScreen> createState() => _TaskScreenState();
@@ -41,11 +45,56 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     final agent = context.watch<AgentController>();
-    _autoScroll(agent.logs.length);
+    final history = context.watch<ChatSessionStore>();
+    final id = widget.sessionId ?? agent.current?.id;
+    // 다른 대화에서 작업이 진행 중이면 이 대화는 저장된 기록만 보여준다.
+    final live = id == null || agent.current?.id == id;
+    final session = live ? agent.current : history.byId(id);
+    final logs = live ? agent.logs : session?.logs ?? const <AgentLogEntry>[];
+    final status = live ? agent.status : session?.status ?? AgentStatus.idle;
+    _autoScroll(logs.length);
+
+    if (!live) {
+      return Scaffold(
+        appBar: AppBar(
+          title: _Title(title: session?.title, status: status),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                itemCount: logs.length,
+                itemBuilder: (_, i) => _LogTile(entry: logs[i]),
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Card(
+                margin: const EdgeInsets.all(12),
+                child: ListTile(
+                  leading: const Icon(Icons.lock_clock),
+                  title: Text(
+                    agent.isBusy ? '다른 대화에서 작업이 진행 중이라 지금은 볼 수만 있어요.' : '이 대화를 열어 이어서 지시할 수 있어요.',
+                  ),
+                  trailing: agent.isBusy || session == null
+                      ? null
+                      : FilledButton(
+                          onPressed: () => agent.openSession(session.id),
+                          child: const Text('이어가기'),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(statusLabel(agent.status)),
+        title: _Title(title: session?.title, status: status),
         actions: [
           if (agent.isBusy)
             TextButton.icon(
@@ -111,6 +160,25 @@ class _TaskScreenState extends State<TaskScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _Title extends StatelessWidget {
+  const _Title({required this.title, required this.status});
+
+  final String? title;
+  final AgentStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    if (title == null || title!.isEmpty) return Text(statusLabel(status));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title!, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(statusLabel(status), style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }

@@ -177,6 +177,34 @@ void main() {
     expect(_lastToolResult(llm.seen[1]), contains('비밀번호'));
   });
 
+  test('저장된 대화 기록으로 새 실행기를 만들어 이어서 지시할 수 있다', () async {
+    // 앱이 결제 승인을 기다리다 꺼진 대화: 마지막 tool call 에 결과가 없다
+    final history = [
+      ChatMessage.user('생수 사줘'),
+      ChatMessage.assistant(
+        toolCalls: const [ToolCall(id: 'a', name: 'request_approval', arguments: {})],
+      ),
+    ];
+    final llm = _ScriptedLlm([const LlmResponse(text: '다시 시작할게요')]);
+    final runner = AgentRunner(
+      llm: llm,
+      browser: _FakeBrowser(),
+      hooks: _Hooks(),
+      systemPrompt: 's',
+      history: history,
+    );
+
+    expect(await runner.run('이어서 해줘'), '다시 시작할게요');
+    expect(llm.seen.single.map((m) => m.role), [
+      ChatRole.user,
+      ChatRole.assistant,
+      ChatRole.tool,
+      ChatRole.user,
+    ]);
+    expect(identical(runner.messages, history), isTrue); // 저장되는 리스트에 그대로 쌓인다
+    expect(history.last.role, ChatRole.assistant);
+  });
+
   test('오래된 페이지 스냅샷은 요약된다', () {
     final msgs = <ChatMessage>[
       for (var i = 0; i < 4; i++)

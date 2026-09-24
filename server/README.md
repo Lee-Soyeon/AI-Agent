@@ -49,6 +49,8 @@ HEADLESS=0 DATA_DIR=./data python -m uvicorn app.main:create_app --factory --hos
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | POST | `/tasks` `{prompt}` | 작업 시작 (한 번에 하나) |
+| GET | `/tasks` | 지난 작업(대화) 목록, 최근 순 |
+| DELETE | `/tasks/{id}` | 작업 기록 삭제 |
 | GET | `/tasks/current`, `/tasks/{id}?since=N` | 상태·로그(N 번째 이후)·대기 중인 승인/질문/도움 |
 | POST | `/tasks/{id}/approval` `{approved, feedback}` | 승인/거절 |
 | POST | `/tasks/{id}/answer` `{text}` | 질문 답변 |
@@ -60,6 +62,9 @@ HEADLESS=0 DATA_DIR=./data python -m uvicorn app.main:create_app --factory --hos
 | WS | `/live?token=` | 실시간 화면(`frame`) 수신, `tap/type/key/scroll/back/navigate` 전송 |
 
 모든 요청은 `Authorization: Bearer <AGENT_TOKEN>` 이 필요합니다.
+
+작업 기록(로그·결과·LLM 대화·마지막 화면)은 `DATA_DIR/tasks/` 에 저장되어, 서버를 재시작해도 앱의 대화 목록에서
+다시 열어 이어서 지시할 수 있습니다. 재시작 때 진행 중이던 작업은 '중단됨(failed)'으로 표시됩니다.
 
 ## 개발
 

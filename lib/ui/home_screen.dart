@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
+import '../agent/chat_session.dart';
 import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
@@ -10,6 +11,7 @@ import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../openai/chatgpt_auth.dart';
 import 'browser_screen.dart';
+import 'history_screen.dart';
 import 'remote_browser_screen.dart';
 import 'settings_screen.dart';
 import 'task_screen.dart';
@@ -83,6 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openTask() =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen()));
 
+  void _openHistory() =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+
   void _openSettings() =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
 
@@ -92,13 +97,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final sessions = context.watch<SiteSessionStore>();
     final agent = context.watch<AgentController>();
     final google = context.watch<GoogleAuthService>();
+    final chats = context.watch<ChatSessionStore>().sessions;
     context.watch<ChatGptAuth>(); // ChatGPT 로그인 상태가 바뀌면 LLM 카드를 갱신
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Agent'),
-        actions: [IconButton(icon: const Icon(Icons.settings), onPressed: _openSettings)],
+        actions: [
+          IconButton(icon: const Icon(Icons.history), tooltip: '대화 기록', onPressed: _openHistory),
+          IconButton(icon: const Icon(Icons.settings), onPressed: _openSettings),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -166,6 +175,18 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.play_arrow),
             label: Text(agent.isBusy ? '작업 진행 중…' : '실행'),
           ),
+          if (chats.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: Text('최근 대화', style: theme.textTheme.titleMedium)),
+                TextButton(onPressed: _openHistory, child: Text('전체 보기 (${chats.length})')),
+              ],
+            ),
+            Card(
+              child: Column(children: [for (final s in chats.take(3)) ChatSessionTile(session: s)]),
+            ),
+          ],
           const SizedBox(height: 16),
           Text('예시', style: theme.textTheme.labelLarge),
           const SizedBox(height: 4),

@@ -58,10 +58,16 @@ class Pending:
     future: asyncio.Future = field(repr=False)
 
 
+def _now() -> str:
+    return dt.datetime.now().isoformat(timespec="seconds")
+
+
 class Task:
     def __init__(self, prompt: str):
         self.id = uuid.uuid4().hex[:12]
         self.prompt = prompt
+        self.created_at = _now()
+        self.updated_at = self.created_at
         self.status = "running"  # running | waiting_approval | waiting_user | finished | failed | cancelled
         self.logs: list[LogEntry] = []
         self.pending: Pending | None = None
@@ -82,6 +88,7 @@ class Task:
         self._changed()
 
     def _changed(self) -> None:
+        self.updated_at = _now()
         for fn in list(self.listeners):
             fn()
 
@@ -95,7 +102,62 @@ class Task:
             "pending": {"type": self.pending.type, **self.pending.data} if self.pending else None,
             "result": self.result,
             "screenshot_version": self.screenshot_version,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }
+
+    def summary(self) -> dict[str, Any]:
+        """작업 목록에 보여줄 요약."""
+        return {
+            "id": self.id,
+            "prompt": self.prompt,
+            "status": self.status,
+            "result": self.result,
+            "log_count": len(self.logs),
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    def to_record(self) -> dict[str, Any]:
+        """디스크에 저장할 전체 기록 (LLM 대화 포함 — 이어서 지시할 때 필요)."""
+        return {
+            **self.summary(),
+            "logs": [vars(entry) for entry in self.logs],
+            "messages": [
+                {
+                    "role": m.role,
+                    "text": m.text,
+                    "tool_calls": [{"id": c.id, "name": c.name, "arguments": c.arguments} for c in m.tool_calls],
+                    "tool_call_id": m.tool_call_id,
+                    "tool_name": m.tool_name,
+                    "raw": m.raw,
+                }
+                for m in self.messages
+            ],
+        }
+
+    @classmethod
+    def from_record(cls, r: dict[str, Any]) -> Task:
+        task = cls(r.get("prompt", ""))
+        task.id = r["id"]
+        task.status = r.get("status", "finished")
+        task.result = r.get("result")
+        task.created_at = r.get("created_at") or task.created_at
+        task.updated_at = r.get("updated_at") or task.created_at
+        task.logs = [LogEntry(**entry) for entry in r.get("logs", [])]
+        task.messages = [
+            Message(
+                role=m["role"],
+                text=m.get("text"),
+                tool_calls=[ToolCall(c["id"], c["name"], c.get("arguments") or {}) for c in m.get("tool_calls") or []],
+                tool_call_id=m.get("tool_call_id"),
+                tool_name=m.get("tool_name"),
+                raw=m.get("raw"),
+            )
+            for m in r.get("messages", [])
+        ]
+        repair_history(task.messages)
+        return task
 
     async def wait_for(self, kind: str, data: dict[str, Any], status: str) -> Any:
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -133,6 +195,24 @@ def compact_history(messages: list[Message]) -> None:
         idx = m.text.index(SNAPSHOT_HEADER)
         url = re.search(r"URL: (.*)", m.text[idx:])
         m.text = f"{m.text[:idx]}[이전 페이지 스냅샷 생략됨 — {url.group(1) if url else ''}]"
+
+
+def repair_history(messages: list[Message]) -> None:
+    """작업이 도중에 끊겨 결과가 없는 tool call 이 남았으면 결과를 채워 다음 요청이 유효하게 한다."""
+    done = {m.tool_call_id for m in messages if m.role == "tool"}
+    i = 0
+    while i < len(messages):
+        m = messages[i]
+        i += 1
+        if m.role != "assistant":
+            continue
+        # tool 결과는 해당 assistant 메시지 바로 뒤에 와야 한다
+        while i < len(messages) and messages[i].role == "tool":
+            i += 1
+        missing = [c for c in m.tool_calls if c.id not in done]
+        for c in missing:
+            messages.insert(i, Message(role="tool", text="작업이 중단되어 실행되지 않았습니다.", tool_call_id=c.id, tool_name=c.name))
+            i += 1
 
 
 def _as_int(v: Any) -> int | None:

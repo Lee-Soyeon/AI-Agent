@@ -24,8 +24,12 @@ class AgentRunner {
     this.maxSteps = 60,
     this.gmail,
     this.gmailAddress,
+    List<ChatMessage>? history,
     SafetyPolicy? safety,
-  }) : safety = safety ?? SafetyPolicy();
+  }) : messages = history ?? [],
+       safety = safety ?? SafetyPolicy() {
+    repairHistory(messages);
+  }
 
   final LlmProvider llm;
   final BrowserDriver browser;
@@ -41,7 +45,8 @@ class AgentRunner {
   /// 이번 대화에서 말투 예시를 확인했는지. 확인 전에는 gmail_send 를 막는다.
   bool _styleChecked = false;
 
-  final List<ChatMessage> messages = [];
+  /// LLM 과 주고받은 대화. 저장된 대화 기록을 넘겨받으면 그 리스트에 이어서 쌓는다.
+  final List<ChatMessage> messages;
   bool _cancelled = false;
 
   static const snapshotHeader = '=== 페이지 스냅샷 ===';
@@ -131,6 +136,33 @@ class AgentRunner {
       }
       await Future<void>.delayed(delay);
       delay *= 2;
+    }
+  }
+
+  /// 앱이 도중에 꺼져 결과가 없는 tool call 이 남았으면, 다음 요청이 유효하도록 결과를 채운다.
+  static void repairHistory(List<ChatMessage> messages) {
+    final answered = {
+      for (final m in messages)
+        if (m.role == ChatRole.tool) m.toolCallId,
+    };
+    var i = 0;
+    while (i < messages.length) {
+      final m = messages[i++];
+      if (m.role != ChatRole.assistant) continue;
+      // tool 결과는 해당 assistant 메시지 바로 뒤에 와야 한다.
+      while (i < messages.length && messages[i].role == ChatRole.tool) {
+        i++;
+      }
+      for (final c in m.toolCalls.where((c) => !answered.contains(c.id))) {
+        messages.insert(
+          i++,
+          ChatMessage.toolResult(
+            toolCallId: c.id,
+            toolName: c.name,
+            content: '작업이 중단되어 실행되지 않았습니다.',
+          ),
+        );
+      }
     }
   }
 

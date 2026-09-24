@@ -5,7 +5,8 @@ enum AgentStatus { idle, running, waitingApproval, waitingUser, finished, failed
 enum LogKind { user, thought, action, observation, approval, error, result }
 
 class AgentLogEntry {
-  AgentLogEntry(this.kind, this.text, {this.detail}) : time = DateTime.now();
+  AgentLogEntry(this.kind, this.text, {this.detail, DateTime? time})
+    : time = time ?? DateTime.now();
 
   final LogKind kind;
   final String text;
@@ -13,6 +14,22 @@ class AgentLogEntry {
   /// 펼쳐서 볼 수 있는 긴 내용(페이지 스냅샷 등).
   final String? detail;
   final DateTime time;
+
+  /// 저장할 때 [detail] 은 [maxDetail] 자까지만 남긴다 (페이지 스냅샷은 매우 길다).
+  Map<String, dynamic> toJson({int maxDetail = 20000}) => {
+    'kind': kind.name,
+    'text': text,
+    if (detail != null)
+      'detail': detail!.length > maxDetail ? '${detail!.substring(0, maxDetail)}\n…(생략)' : detail,
+    'time': time.toIso8601String(),
+  };
+
+  factory AgentLogEntry.fromJson(Map<String, dynamic> j) => AgentLogEntry(
+    LogKind.values.asNameMap()[j['kind']] ?? LogKind.observation,
+    '${j['text'] ?? ''}',
+    detail: j['detail'] as String?,
+    time: DateTime.tryParse('${j['time']}'),
+  );
 }
 
 enum ApprovalKind {
