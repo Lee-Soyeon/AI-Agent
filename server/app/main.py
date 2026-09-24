@@ -78,6 +78,8 @@ def create_app(
             openai_key=settings.openai_api_key,
             gemini_key=settings.gemini_api_key,
             anthropic_workspace_id=settings.anthropic_workspace_id,
+            xai_key=settings.xai_api_key,
+            openrouter_key=settings.openrouter_api_key,
         )
         yield
         for t in state["tasks"].values():

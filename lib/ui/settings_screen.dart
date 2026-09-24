@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/settings_store.dart';
+import '../llm/model_list.dart';
 import '../remote/agent_server_client.dart';
 import 'chatgpt_login.dart';
 import 'app_theme.dart';
@@ -55,6 +56,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// 입력한 API 키로 공급자에게 모델 목록을 물어보고 골라서 넣는다.
+  Future<void> _pickModel(LlmVendor v) async {
+    final key = _keys[v]!.text.trim();
+    if (key.isEmpty && v != LlmVendor.openrouter) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('먼저 API 키를 입력하세요.')));
+      return;
+    }
+    final lister = ModelLister();
+    final future = switch (v) {
+      LlmVendor.gemini => lister.gemini(key),
+      LlmVendor.openai => lister.openai(key),
+      LlmVendor.anthropic => lister.anthropic(key, workspaceId: _workspaceId.text.trim()),
+      LlmVendor.grok => lister.grok(key),
+      LlmVendor.openrouter => lister.openRouter(key),
+      LlmVendor.chatgpt => Future.value(const <String>[]),
+    };
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        builder: (context, scroll) => FutureBuilder<List<String>>(
+          future: future,
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('모델 목록을 불러오지 못했습니다.\n${snap.error}'),
+              );
+            }
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            final models = snap.data!;
+            return ListView(
+              controller: scroll,
+              children: [
+                ListTile(
+                  title: Text('${v.label} — 이 키로 쓸 수 있는 모델 ${models.length}개'),
+                  subtitle: const Text(
+                    '에이전트는 도구 호출이 되는 모델이 필요합니다. 이름에 flash·lite·mini 가 붙은 모델이 싸고 빠릅니다.',
+                  ),
+                ),
+                for (final m in models)
+                  ListTile(
+                    dense: true,
+                    title: Text(m),
+                    trailing: m == _models[v]!.text ? const Icon(Icons.check) : null,
+                    onTap: () => Navigator.pop(context, m),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+    if (picked != null) setState(() => _models[v]!.text = picked);
   }
 
   Future<void> _testServer() async {
@@ -210,7 +269,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: _models[v],
               autocorrect: false,
-              decoration: InputDecoration(labelText: '모델', helperText: '기본값: ${v.defaultModel}'),
+              decoration: InputDecoration(
+                labelText: '모델',
+                helperText: '기본값: ${v.defaultModel}',
+                suffixIcon: v.usesApiKey
+                    ? IconButton(
+                        tooltip: '사용 가능한 모델 목록',
+                        icon: const Icon(Icons.format_list_bulleted),
+                        onPressed: () => _pickModel(v),
+                      )
+                    : null,
+              ),
             ),
             if (v == LlmVendor.anthropic) ...[
               const SizedBox(height: 8),

@@ -21,6 +21,8 @@ class Settings:
     anthropic_workspace_id: str = field(default_factory=lambda: os.getenv("ANTHROPIC_WORKSPACE_ID", ""))
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
+    xai_api_key: str = field(default_factory=lambda: os.getenv("XAI_API_KEY", ""))
+    openrouter_api_key: str = field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
 
     max_steps: int = field(default_factory=lambda: int(os.getenv("MAX_STEPS", "60")))
     # 로그인 쿠키 등 브라우저 프로필이 저장되는 곳 (볼륨으로 유지해야 재시작 후에도 로그인 유지)

@@ -84,8 +84,19 @@ async def _post(client: httpx.AsyncClient, url: str, headers: dict[str, str], bo
 
 
 class OpenAiProvider:
-    def __init__(self, api_key: str, model: str, client: httpx.AsyncClient | None = None):
+    """OpenAI Chat Completions. 같은 형식인 xAI(Grok)·OpenRouter 도 base_url 만 바꿔 쓴다."""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        client: httpx.AsyncClient | None = None,
+        base_url: str = "https://api.openai.com/v1",
+        extra_headers: dict[str, str] | None = None,
+    ):
         self.api_key, self.model = api_key, model
+        self.base_url = base_url.rstrip("/")
+        self.extra_headers = extra_headers or {}
         self.client = client or httpx.AsyncClient()
 
     @staticmethod
@@ -129,8 +140,8 @@ class OpenAiProvider:
     async def complete(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
         data = await _post(
             self.client,
-            "https://api.openai.com/v1/chat/completions",
-            {"authorization": f"Bearer {self.api_key}"},
+            f"{self.base_url}/chat/completions",
+            {"authorization": f"Bearer {self.api_key}", **self.extra_headers},
             self.build_body(self.model, system, messages, tools),
         )
         return self.parse(data)
@@ -270,7 +281,14 @@ class GeminiProvider:
         return self.parse(data)
 
 
-DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-4.1", "gemini": "gemini-3.6-flash"}
+DEFAULT_MODELS = {
+    "anthropic": "claude-sonnet-5",
+    "openai": "gpt-4.1",
+    "gemini": "gemini-3.6-flash",
+    "grok": "grok-4.3",
+    # 도구 호출이 되는 무료 모델로 자동 연결
+    "openrouter": "openrouter/free",
+}
 
 
 def create_provider(
@@ -281,6 +299,8 @@ def create_provider(
     openai_key: str,
     gemini_key: str,
     anthropic_workspace_id: str = "",
+    xai_key: str = "",
+    openrouter_key: str = "",
 ) -> LlmProvider:
     model = model or DEFAULT_MODELS.get(provider, "")
     if provider == "anthropic":
@@ -289,6 +309,12 @@ def create_provider(
         return OpenAiProvider(openai_key, model)
     if provider == "gemini":
         return GeminiProvider(gemini_key, model)
+    if provider == "grok":
+        return OpenAiProvider(xai_key, model, base_url="https://api.x.ai/v1")
+    if provider == "openrouter":
+        return OpenAiProvider(
+            openrouter_key, model, base_url="https://openrouter.ai/api/v1", extra_headers={"X-Title": "AI Agent"}
+        )
     raise ValueError(f"알 수 없는 LLM_PROVIDER: {provider}")
 
 

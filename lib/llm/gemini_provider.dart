@@ -127,12 +127,24 @@ class GeminiProvider implements LlmProvider {
     required List<ChatMessage> messages,
     required List<ToolSpec> tools,
   }) async {
-    final json = await postJson(
-      _client,
-      Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
-      headers: {'x-goog-api-key': apiKey},
-      body: buildBody(system: system, messages: messages, tools: tools),
-    );
+    final Map<String, dynamic> json;
+    try {
+      json = await postJson(
+        _client,
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
+        headers: {'x-goog-api-key': apiKey},
+        body: buildBody(system: system, messages: messages, tools: tools),
+      );
+    } on LlmException catch (e) {
+      if (e.statusCode == 404) {
+        throw LlmException(
+          '"$model" 모델을 쓸 수 없습니다. 설정 → Gemini 모델 칸 옆의 목록 버튼으로 '
+          '사용 가능한 모델을 골라 주세요. (${e.message})',
+          statusCode: 404,
+        );
+      }
+      rethrow;
+    }
     return parseResponse(json);
   }
 }

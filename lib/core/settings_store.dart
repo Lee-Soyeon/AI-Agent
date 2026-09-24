@@ -14,7 +14,10 @@ enum LlmVendor {
   openai('OpenAI API', 'gpt-4.1'),
   chatgpt('ChatGPT 구독 (Plus/Pro)', 'gpt-5.5', usesApiKey: false),
   anthropic('Claude (Anthropic)', 'claude-sonnet-5'),
-  gemini('Gemini (Google)', 'gemini-3.6-flash');
+  gemini('Gemini (Google)', 'gemini-3.6-flash'),
+  grok('Grok (xAI)', 'grok-4.3'),
+  // 도구 호출이 되는 무료 모델로 자동 연결 (무료: 하루 50회, $10 충전 시 1,000회)
+  openrouter('OpenRouter', 'openrouter/free');
 
   const LlmVendor(this.label, this.defaultModel, {this.usesApiKey = true});
 
@@ -144,6 +147,8 @@ class SettingsStore extends ChangeNotifier {
         workspaceId: anthropicWorkspaceId,
       ),
       LlmVendor.gemini => GeminiProvider(apiKey: key, model: m),
+      LlmVendor.grok => OpenAiProvider.grok(apiKey: key, model: m),
+      LlmVendor.openrouter => OpenAiProvider.openRouter(apiKey: key, model: m),
     };
   }
 }
