@@ -3,6 +3,7 @@ import 'dart:async';
 import '../browser/agent_browser.dart';
 import '../google/gmail_api.dart';
 import '../google/writing_style.dart';
+import '../services/service_catalog.dart';
 import '../llm/llm_types.dart';
 import 'agent_models.dart';
 import 'agent_tools.dart';
@@ -24,6 +25,7 @@ class AgentRunner {
     this.maxSteps = 60,
     this.gmail,
     this.gmailAddress,
+    this.catalog,
     List<ChatMessage>? history,
     SafetyPolicy? safety,
   }) : messages = history ?? [],
@@ -41,11 +43,12 @@ class AgentRunner {
   /// Google 계정이 연결되지 않았으면 null.
   final GmailApi? gmail;
   final String? gmailAddress;
+  final ServiceCatalog? catalog;
 
   /// 이번 대화에서 말투 예시를 확인했는지. 확인 전에는 gmail_send 를 막는다.
   bool _styleChecked = false;
 
-  /// LLM 과 주고받은 대화. 저장된 대화 기록을 넘겨받으면 그 리스트에 이어서 쌓는다.
+  /// LLM 과 주고받은 대화. 저장해 둔 대화를 넘겨받으면 그 리스트에 이어서 쌓는다.
   final List<ChatMessage> messages;
   bool _cancelled = false;
 
@@ -401,6 +404,20 @@ class AgentRunner {
           hooks.onLog(AgentLogEntry(LogKind.approval, '✅ 메일을 보냈습니다: ${email.subject}'));
           return _Outcome('전송 완료 (id: $sentId)');
 
+        case AgentTools.serviceInfo:
+          final found = catalog?.find('${a['service'] ?? ''}') ?? const <KService>[];
+          if (found.isEmpty) {
+            return const _Outcome('카탈로그에 없는 서비스입니다. 일반 검색(네이버·구글)으로 공식 사이트를 찾아 진행하세요.');
+          }
+          final kw = '${a['keyword'] ?? ''}'.trim();
+          final url = kw.isEmpty ? null : found.first.searchUrl(kw);
+          hooks.onLog(
+            AgentLogEntry(LogKind.observation, '서비스 정보: ${found.map((s) => s.name).join(', ')}'),
+          );
+          return _Outcome(
+            [...found.map((s) => s.describe()), if (url != null) '검색 결과 URL: $url'].join('\n\n'),
+          );
+
         case AgentTools.finish:
           final s = '${a['summary'] ?? '완료했습니다.'}';
           return _Outcome('보고 완료', finishSummary: s);
@@ -460,6 +477,7 @@ class AgentRunner {
       AgentTools.askUser => '❓ 질문: ${a['question']}',
       AgentTools.requestUserHelp => '🧑 사용자 도움 요청: ${a['reason']}',
       AgentTools.finish => '🏁 완료',
+      AgentTools.serviceInfo => '📇 서비스 정보: ${a['service']}',
       AgentTools.gmailSearch => '📬 메일 검색: ${a['query']}',
       AgentTools.gmailRead => '📖 메일 읽기',
       AgentTools.gmailSend => '✉️ 메일 전송 준비: ${a['subject']}',

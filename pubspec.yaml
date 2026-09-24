@@ -66,6 +66,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # 한국 주요 서비스 카탈로그 — 서버(server/app)와 같은 파일을 쓴다.
+  assets:
+    - server/app/services.json
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

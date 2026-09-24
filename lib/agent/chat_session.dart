@@ -1,73 +1,58 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../llm/llm_types.dart';
 import 'agent_models.dart';
+import 'agent_runner.dart';
 
-/// 에이전트와 나눈 대화 하나. 끝나도 버리지 않고 저장해 두었다가 목록에서 다시 열어 이어서 지시한다.
+/// 채팅 탭의 대화 하나. 에이전트에게 준 작업과 그 진행 기록을 담는다.
 class ChatSession {
   ChatSession({
     required this.id,
-    required this.title,
-    DateTime? createdAt,
+    this.title = '새 채팅',
     DateTime? updatedAt,
-    this.status = AgentStatus.idle,
     List<AgentLogEntry>? logs,
-    List<ChatMessage>? messages,
+    this.status = AgentStatus.idle,
     this.lastResult,
-    this.vendor,
     this.remoteTaskId,
     this.remoteLogCount = 0,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       updatedAt = updatedAt ?? createdAt ?? DateTime.now(),
-       logs = logs ?? [],
-       messages = messages ?? [];
+    this.vendor,
+    this.hasSavedHistory = false,
+  }) : updatedAt = updatedAt ?? DateTime.now(),
+       logs = logs ?? [];
 
-  factory ChatSession.create(String firstMessage, {String? vendor, String? remoteTaskId}) =>
-      ChatSession(
-        id: _newId(),
-        title: titleFrom(firstMessage),
-        vendor: vendor,
-        remoteTaskId: remoteTaskId,
-      );
+  /// 저장할 때 대화당 남기는 최대 로그 수 (오래된 것부터 버린다).
+  static const maxSavedLogs = 300;
 
   final String id;
   String title;
-  final DateTime createdAt;
   DateTime updatedAt;
-  AgentStatus status;
   final List<AgentLogEntry> logs;
-
-  /// 기기에서 실행한 대화의 LLM 메시지 기록 (이어서 지시할 때 그대로 이어 붙인다).
-  final List<ChatMessage> messages;
+  AgentStatus status;
   String? lastResult;
 
-  /// 기기에서 실행할 때 쓴 LLM 공급자 (LlmVendor.name).
-  String? vendor;
-
-  /// 서버에서 실행한 대화면 서버 작업 ID. 서버가 기록을 갖고 있고, 앱은 로그를 캐시해 둔다.
+  /// 서버 모드 작업 id. 있으면 앱을 다시 켜도 이어서 지시할 수 있다.
   String? remoteTaskId;
-
-  /// 서버 로그 중 몇 개를 받아 두었는지.
   int remoteLogCount;
 
-  /// 마지막 브라우저 화면 (별도 파일로 저장).
-  Uint8List? screenshot;
-  bool screenshotDirty = false;
+  /// 이 폰에서 실행한 대화의 실행기. 메모리에만 있으므로 앱을 다시 켜면 사라진다.
+  AgentRunner? runner;
 
-  bool get isRemote => remoteTaskId != null;
+  /// 이 폰에서 실행할 때 쓴 LLM 공급자 (LlmVendor.name).
+  String? vendor;
 
-  bool get isBusy =>
-      status == AgentStatus.running ||
-      status == AgentStatus.waitingApproval ||
-      status == AgentStatus.waitingUser;
+  /// LLM 대화가 [ChatHistoryFiles] 에 저장되어 있어, 앱을 다시 켜도 실행기를 되살려 이어갈 수 있는지.
+  bool hasSavedHistory;
 
-  /// 목록에 보여줄 한 줄 요약: 결과가 있으면 결과, 없으면 마지막 로그.
+  bool get isEmpty => logs.isEmpty && remoteTaskId == null && runner == null;
+
+  /// 이어서 지시할 수 있는지 (실행기가 살아 있거나 서버 작업이 있을 때).
+  bool get canContinue => runner != null || remoteTaskId != null || hasSavedHistory;
+
+  /// 목록에 보여줄 마지막 한 줄.
   String get preview {
     if (lastResult != null && lastResult!.trim().isNotEmpty) return lastResult!.trim();
     for (final l in logs.reversed) {
@@ -76,208 +61,108 @@ class ChatSession {
     return '';
   }
 
-  static String titleFrom(String text) {
-    final line = text.trim().split('\n').first.trim();
-    return line.length > 60 ? '${line.substring(0, 60)}…' : line;
+  static String titleFrom(String task) {
+    final t = task.trim().replaceAll(RegExp(r'\s+'), ' ');
+    return t.length > 40 ? '${t.substring(0, 40)}…' : t;
   }
 
-  static String _newId() {
-    final r = Random();
-    return '${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}'
-        '${r.nextInt(1 << 32).toRadixString(36)}';
-  }
-
+  // 페이지 스냅샷 같은 긴 detail 은 저장하지 않는다 (용량, 민감 정보 최소화).
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
-    'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'status': status.name,
-    'logs': [for (final l in logs) l.toJson()],
-    'messages': [for (final m in messages) m.toJson()],
-    if (lastResult != null) 'lastResult': lastResult,
-    if (vendor != null) 'vendor': vendor,
-    if (remoteTaskId != null) 'remoteTaskId': remoteTaskId,
+    'lastResult': lastResult,
+    'remoteTaskId': remoteTaskId,
     'remoteLogCount': remoteLogCount,
+    'vendor': vendor,
+    'hasSavedHistory': hasSavedHistory,
+    'logs': [
+      for (final l in logs.length > maxSavedLogs ? logs.sublist(logs.length - maxSavedLogs) : logs)
+        {'kind': l.kind.name, 'text': l.text, 'time': l.time.toIso8601String()},
+    ],
   };
 
-  factory ChatSession.fromJson(Map<String, dynamic> j) => ChatSession(
-    id: '${j['id']}',
-    title: '${j['title'] ?? ''}',
-    createdAt: DateTime.tryParse('${j['createdAt']}'),
-    updatedAt: DateTime.tryParse('${j['updatedAt']}'),
-    status: AgentStatus.values.asNameMap()[j['status']] ?? AgentStatus.finished,
-    logs: [
-      for (final l in (j['logs'] as List? ?? const []))
-        AgentLogEntry.fromJson((l as Map).cast<String, dynamic>()),
-    ],
-    messages: [
-      for (final m in (j['messages'] as List? ?? const []))
-        ChatMessage.fromJson((m as Map).cast<String, dynamic>()),
-    ],
-    lastResult: j['lastResult'] as String?,
-    vendor: j['vendor'] as String?,
-    remoteTaskId: j['remoteTaskId'] as String?,
-    remoteLogCount: j['remoteLogCount'] as int? ?? 0,
-  );
+  factory ChatSession.fromJson(Map<String, dynamic> j) {
+    final remoteId = j['remoteTaskId'] as String?;
+    var status = AgentStatus.values.asNameMap()[j['status']] ?? AgentStatus.idle;
+    // 이 폰에서 돌던 작업은 앱이 꺼지면서 멈췄다. 서버 작업은 열 때 서버에서 상태를 다시 받는다.
+    final wasBusy =
+        status == AgentStatus.running ||
+        status == AgentStatus.waitingApproval ||
+        status == AgentStatus.waitingUser;
+    if (remoteId == null && wasBusy) status = AgentStatus.cancelled;
+    return ChatSession(
+      id: j['id'] as String,
+      title: j['title'] as String? ?? '채팅',
+      updatedAt: DateTime.tryParse('${j['updatedAt']}'),
+      status: status,
+      lastResult: j['lastResult'] as String?,
+      remoteTaskId: remoteId,
+      remoteLogCount: j['remoteLogCount'] as int? ?? 0,
+      vendor: j['vendor'] as String?,
+      hasSavedHistory: j['hasSavedHistory'] == true,
+      logs: [
+        for (final l in (j['logs'] as List? ?? const []))
+          AgentLogEntry(
+            LogKind.values.asNameMap()['${(l as Map)['kind']}'] ?? LogKind.observation,
+            '${l['text'] ?? ''}',
+            time: DateTime.tryParse('${l['time']}'),
+          ),
+      ],
+    );
+  }
 }
 
-/// 대화 목록을 기기에 저장한다 (대화마다 JSON 파일 하나 + 마지막 화면 JPEG).
-class ChatSessionStore extends ChangeNotifier {
-  /// [directory] 가 없으면 앱 지원 폴더의 chat_sessions/ 를 쓴다.
-  ChatSessionStore({Directory? directory}) : _dir = directory;
-
-  /// 테스트용: 디스크에 저장하지 않는다.
-  ChatSessionStore.memory() : _dir = null, _memoryOnly = true;
+/// 이 폰에서 실행한 대화의 LLM 메시지를 대화마다 파일 하나로 저장한다.
+/// (페이지 스냅샷이 들어 있어 SharedPreferences 에 두기엔 크다.) 이어서 지시할 때만 읽는다.
+class ChatHistoryFiles {
+  /// [directory] 가 없으면 앱 지원 폴더의 chat_history/ 를 쓴다.
+  ChatHistoryFiles({Directory? directory}) : _dir = directory;
 
   Directory? _dir;
-  bool _memoryOnly = false;
 
-  /// 이보다 많으면 오래된 대화부터 지운다.
-  static const maxSessions = 100;
-  static const _saveDelay = Duration(milliseconds: 400);
-
-  final Map<String, ChatSession> _sessions = {};
-  final Map<String, Timer> _pending = {};
-
-  /// 최근에 바뀐 순.
-  List<ChatSession> get sessions =>
-      _sessions.values.toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-  ChatSession? byId(String id) => _sessions[id];
-
-  ChatSession? byRemoteTaskId(String taskId) {
-    for (final s in _sessions.values) {
-      if (s.remoteTaskId == taskId) return s;
-    }
-    return null;
-  }
-
-  Future<Directory?> _directory() async {
-    if (_memoryOnly) return null;
+  Future<File> _file(String id) async {
     final dir = _dir ??= Directory(
-      '${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}chat_sessions',
+      '${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}chat_history',
     );
     await dir.create(recursive: true);
-    return dir;
+    return File('${dir.path}${Platform.pathSeparator}$id.json');
   }
 
-  File _file(Directory dir, String id, String ext) =>
-      File('${dir.path}${Platform.pathSeparator}$id.$ext');
-
-  Future<void> load() async {
+  /// 저장에 성공하면 true.
+  Future<bool> save(String id, List<ChatMessage> messages) async {
     try {
-      final dir = await _directory();
-      if (dir == null) return;
-      await for (final f in dir.list()) {
-        if (f is! File || !f.path.endsWith('.json')) continue;
-        try {
-          final s = ChatSession.fromJson(
-            (jsonDecode(await f.readAsString()) as Map).cast<String, dynamic>(),
-          );
-          // 기기에서 돌던 작업은 앱이 꺼지면서 멈췄다. 서버 작업은 서버에서 계속된다.
-          if (s.isBusy && !s.isRemote) {
-            s.status = AgentStatus.cancelled;
-            s.logs.add(AgentLogEntry(LogKind.error, '앱이 종료되어 작업이 중단되었습니다. 이어서 지시할 수 있습니다.'));
-            save(s);
-          }
-          _sessions[s.id] = s;
-        } catch (e) {
-          debugPrint('대화 기록을 읽지 못했습니다: ${f.path} $e');
-        }
-      }
+      final f = await _file(id);
+      final tmp = File('${f.path}.tmp');
+      await tmp.writeAsString(jsonEncode([for (final m in messages) m.toJson()]), flush: true);
+      await tmp.rename(f.path);
+      return true;
     } catch (e) {
-      debugPrint('대화 기록 폴더를 열지 못했습니다: $e');
-    }
-    notifyListeners();
-  }
-
-  /// 새 대화를 목록에 추가한다.
-  void add(ChatSession s) {
-    _sessions[s.id] = s;
-    _trim();
-    save(s);
-  }
-
-  /// 대화가 바뀌었을 때 호출한다. 연달아 호출되면 잠깐 모아서 한 번에 쓴다.
-  void save(ChatSession s, {bool touch = true}) {
-    if (touch) s.updatedAt = DateTime.now();
-    notifyListeners();
-    if (_memoryOnly || _pending.containsKey(s.id)) return;
-    _pending[s.id] = Timer(_saveDelay, () {
-      _pending.remove(s.id);
-      _write(s);
-    });
-  }
-
-  /// 기다리던 저장을 지금 모두 쓴다 (앱이 백그라운드로 갈 때).
-  Future<void> flush() async {
-    final ids = _pending.keys.toList();
-    for (final id in ids) {
-      _pending.remove(id)?.cancel();
-      final s = _sessions[id];
-      if (s != null) await _write(s);
+      debugPrint('LLM 대화를 저장하지 못했습니다: $id $e');
+      return false;
     }
   }
 
-  Future<void> _write(ChatSession s) async {
-    if (!_sessions.containsKey(s.id)) return; // 저장 전에 삭제됨
+  /// 저장된 대화가 없거나 읽지 못하면 null.
+  Future<List<ChatMessage>?> load(String id) async {
     try {
-      final dir = await _directory();
-      if (dir == null) return;
-      final tmp = _file(dir, s.id, 'tmp');
-      await tmp.writeAsString(jsonEncode(s.toJson()), flush: true);
-      await tmp.rename(_file(dir, s.id, 'json').path);
-      final shot = s.screenshot;
-      if (shot != null && s.screenshotDirty) {
-        s.screenshotDirty = false;
-        await _file(dir, s.id, 'jpg').writeAsBytes(shot);
-      }
+      final f = await _file(id);
+      if (!await f.exists()) return null;
+      return [
+        for (final m in jsonDecode(await f.readAsString()) as List)
+          ChatMessage.fromJson((m as Map).cast<String, dynamic>()),
+      ];
     } catch (e) {
-      debugPrint('대화 기록을 저장하지 못했습니다: ${s.id} $e');
+      debugPrint('LLM 대화를 읽지 못했습니다: $id $e');
+      return null;
     }
-  }
-
-  /// 저장해 둔 마지막 브라우저 화면을 읽는다.
-  Future<Uint8List?> loadScreenshot(ChatSession s) async {
-    if (s.screenshot != null) return s.screenshot;
-    try {
-      final dir = await _directory();
-      if (dir == null) return null;
-      final f = _file(dir, s.id, 'jpg');
-      if (await f.exists()) s.screenshot = await f.readAsBytes();
-    } catch (_) {}
-    return s.screenshot;
   }
 
   Future<void> delete(String id) async {
-    _pending.remove(id)?.cancel();
-    if (_sessions.remove(id) == null) return;
-    notifyListeners();
     try {
-      final dir = await _directory();
-      if (dir == null) return;
-      for (final ext in ['json', 'jpg', 'tmp']) {
-        final f = _file(dir, id, ext);
-        if (await f.exists()) await f.delete();
-      }
-    } catch (e) {
-      debugPrint('대화 기록을 지우지 못했습니다: $id $e');
-    }
-  }
-
-  void _trim() {
-    final all = sessions;
-    for (final s in all.skip(maxSessions)) {
-      if (!s.isBusy) delete(s.id);
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final t in _pending.values) {
-      t.cancel();
-    }
-    super.dispose();
+      final f = await _file(id);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 }

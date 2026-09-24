@@ -23,7 +23,7 @@ class ChatGptAccountTile extends StatelessWidget {
             if (auth.isSignedIn)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.verified_user, color: Colors.green),
+                leading: Icon(Icons.verified_user, color: theme.colorScheme.primary),
                 title: Text(auth.email ?? 'ChatGPT 계정'),
                 subtitle: Text('요금제: ${auth.planType ?? '알 수 없음'}'),
                 trailing: TextButton(onPressed: auth.signOut, child: const Text('로그아웃')),

@@ -208,7 +208,6 @@ class _RemoteBrowserScreenState extends State<RemoteBrowserScreen> {
                       decoration: InputDecoration(
                         hintText: '입력할 글자 (탭한 칸에 입력됨)',
                         isDense: true,
-                        border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
                           tooltip: '글자 가리기',
                           icon: Icon(_secret ? Icons.lock : Icons.lock_open),

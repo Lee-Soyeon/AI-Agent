@@ -12,6 +12,7 @@ class AgentTools {
   static const askUser = 'ask_user';
   static const requestUserHelp = 'request_user_help';
   static const finish = 'finish';
+  static const serviceInfo = 'service_info';
   static const gmailSearch = 'gmail_search';
   static const gmailRead = 'gmail_read';
   static const gmailSend = 'gmail_send';
@@ -198,6 +199,20 @@ class AgentTools {
           'reply_to_message_id': {'type': 'string', 'description': '답장할 원본 메일 id (선택)'},
         },
         'required': ['to', 'subject', 'body'],
+      },
+    ),
+    const ToolSpec(
+      name: serviceInfo,
+      description:
+          '한국 주요 서비스의 시작·로그인·검색 URL 과 사용 팁을 알려준다. 처음 쓰는 서비스는 먼저 호출하라. '
+          'keyword 를 주면 그 서비스의 검색 결과 URL 도 만들어 준다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'service': {'type': 'string', 'description': '서비스 이름 (예: 쿠팡, 네이버 지도, 코레일)'},
+          'keyword': {'type': 'string', 'description': '검색어 (선택)'},
+        },
+        'required': ['service'],
       },
     ),
     const ToolSpec(

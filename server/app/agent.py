@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from . import catalog
 from .browser import BrowserError
 from .llm import LlmProvider, Message, ToolCall, complete_with_retry
 from .safety import SafetyPolicy
@@ -27,6 +28,9 @@ def system_prompt(now: dt.datetime | None = None) -> str:
     return f"""당신은 사용자를 대신해 웹 서비스를 조작하는 AI 에이전트입니다.
 서버의 크롬 브라우저(휴대폰 화면 크기)를 도구로 조작합니다. 사용자는 이 브라우저에 미리 로그인해 두었을 수 있습니다.
 현재 시각: {t} (한국 시간)
+
+## 지원 서비스 (상세 URL·팁은 service_info 도구로 확인)
+{catalog.prompt_index()}
 
 ## 작업 방식
 1. 필요한 사이트를 open_url 로 열고, 스냅샷의 요소 id 로 click / type_text 하세요. id 는 스냅샷마다 바뀝니다.
@@ -371,6 +375,16 @@ class AgentRunner:
                     reason = str(a.get("reason", "직접 처리해 주세요."))
                     await task.wait_for("help", {"reason": reason}, "waiting_user")
                     return await self._observe(task, "사용자가 직접 처리를 마쳤습니다. 페이지를 다시 확인하세요.")
+                case "service_info":
+                    found = catalog.find(str(a.get("service", "")))
+                    if not found:
+                        return "카탈로그에 없는 서비스입니다. 일반 검색(네이버·구글)으로 공식 사이트를 찾아 진행하세요.", None
+                    kw = str(a.get("keyword") or "").strip()
+                    parts = [catalog.describe(s) for s in found]
+                    if kw and (url := catalog.search_url(found[0], kw)):
+                        parts.append(f"검색 결과 URL: {url}")
+                    task.log("observation", f"서비스 정보: {', '.join(s['name'] for s in found)}")
+                    return "\n\n".join(parts), None
                 case "finish":
                     return "보고 완료", str(a.get("summary", "완료했습니다."))
                 case _:
@@ -394,4 +408,5 @@ def _describe(c: ToolCall) -> str:
         "ask_user": f"❓ 질문: {a.get('question')}",
         "request_user_help": f"🧑 사용자 도움 요청: {a.get('reason')}",
         "finish": "🏁 완료",
+        "service_info": f"📇 서비스 정보: {a.get('service')}",
     }.get(c.name, f"{c.name} {a}")

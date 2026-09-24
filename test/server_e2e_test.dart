@@ -103,15 +103,15 @@ void main() {
     await agent.followUp('고마워');
     await until(() => agent.status == AgentStatus.finished && agent.lastResult == '후속 답변');
 
-    // 대화는 목록에 남고, 닫았다가 다시 열면 로그가 그대로 보인다
-    final session = agent.history.sessions.single;
+    // 대화는 목록에 남고, 새 채팅을 열었다가 다시 열면 로그가 그대로 보인다
+    final session = agent.chats.single;
     expect(session.remoteTaskId, isNotNull);
     expect(session.title, '생수 주문해줘');
     expect(session.status, AgentStatus.finished);
     final logCount = agent.logs.length;
-    agent.closeSession();
+    agent.newSession();
     expect(agent.logs, isEmpty);
-    expect(await agent.openSession(session.id), isTrue);
+    agent.openSession(session.id);
     expect(agent.logs.length, logCount);
     expect(agent.lastResult, '후속 답변');
     expect(agent.hasConversation, isTrue);
@@ -128,12 +128,12 @@ void main() {
     await reopened.attachToServer();
     await until(() => reopened.lastResult == '후속 답변');
     expect(reopened.logs.length, agent.logs.length);
-    expect(reopened.history.sessions.single.remoteTaskId, session.remoteTaskId);
+    expect(reopened.chats.single.remoteTaskId, session.remoteTaskId);
+    expect(reopened.chats.single.title, '생수 주문해줘');
 
     // 대화를 지우면 서버 기록도 지운다
-    expect(await agent.deleteSession(session.id), isTrue);
-    expect(agent.current, isNull);
-    expect(agent.history.sessions, isEmpty);
+    agent.deleteSession(session.id);
+    expect(agent.chats, isEmpty);
     final client = settings.serverClient!;
     for (var i = 0; i < 50 && (await client.listTasks()).isNotEmpty; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 100));

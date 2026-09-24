@@ -123,7 +123,7 @@ class _WritingStyleScreenState extends State<WritingStyleScreen> {
                 controller: _guide,
                 maxLines: null,
                 minLines: 12,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
+                decoration: const InputDecoration(),
               )
             else
               Card(

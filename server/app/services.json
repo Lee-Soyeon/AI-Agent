@@ -1,0 +1,885 @@
+{
+ "version": 1,
+ "updated": "2026-09-24",
+ "services": [
+  {
+   "id": "youtube",
+   "name": "YouTube",
+   "category": "동영상",
+   "web": "web",
+   "home": "https://m.youtube.com/",
+   "login": "https://accounts.google.com/",
+   "search": "https://m.youtube.com/results?search_query={q}",
+   "hint": "재생목록 정리, 구독 채널 확인, 영상 검색",
+   "account": "google"
+  },
+  {
+   "id": "kakaotalk",
+   "name": "카카오톡",
+   "category": "메신저",
+   "web": "app_only",
+   "note": "채팅은 앱(PC 앱) 전용이고 웹 버전이 없음"
+  },
+  {
+   "id": "naver",
+   "name": "네이버",
+   "category": "포털",
+   "web": "web",
+   "home": "https://m.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "search": "https://m.search.naver.com/search.naver?query={q}",
+   "hint": "검색, 뉴스, 날씨. 네이버 계정 하나로 쇼핑·지도·예약·메일·카페가 모두 로그인됨",
+   "account": "naver"
+  },
+  {
+   "id": "google",
+   "name": "Google 검색",
+   "category": "포털",
+   "web": "web",
+   "home": "https://www.google.com/",
+   "login": "https://accounts.google.com/",
+   "search": "https://www.google.com/search?q={q}",
+   "account": "google"
+  },
+  {
+   "id": "chrome",
+   "name": "Chrome",
+   "category": "브라우저",
+   "web": "app_only",
+   "note": "브라우저 자체(에이전트가 이미 크롬을 사용)"
+  },
+  {
+   "id": "coupang",
+   "name": "쿠팡",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://m.coupang.com/",
+   "login": "https://login.coupang.com/login/login.pang",
+   "search": "https://m.coupang.com/nm/search?q={q}",
+   "hint": "장바구니: https://cart.coupang.com/cartView.pang . 가격·단위가격·로켓배송·리뷰를 비교. 결제 비밀번호(쿠페이)는 사용자에게 넘김"
+  },
+  {
+   "id": "instagram",
+   "name": "인스타그램",
+   "category": "SNS",
+   "web": "web",
+   "home": "https://www.instagram.com/",
+   "login": "https://www.instagram.com/accounts/login/",
+   "hint": "피드·DM·프로필 확인 가능. 게시·DM 전송은 승인 후"
+  },
+  {
+   "id": "naver_map",
+   "name": "네이버 지도·플레이스·예약",
+   "category": "지도·예약",
+   "web": "web",
+   "home": "https://map.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "search": "https://map.naver.com/p/search/{q}",
+   "hint": "장소 검색, 길찾기, 플레이스 페이지의 '예약' 버튼으로 식당·미용실·병원 예약. 예약 확정은 승인 후",
+   "account": "naver"
+  },
+  {
+   "id": "kakao_map",
+   "name": "카카오맵",
+   "category": "지도",
+   "web": "web",
+   "home": "https://map.kakao.com/",
+   "login": "https://accounts.kakao.com/login",
+   "search": "https://map.kakao.com/?q={q}",
+   "hint": "장소 검색·길찾기",
+   "account": "kakao"
+  },
+  {
+   "id": "tmap",
+   "name": "티맵",
+   "category": "내비게이션",
+   "web": "app_only",
+   "note": "내비게이션은 앱 전용"
+  },
+  {
+   "id": "daangn",
+   "name": "당근",
+   "category": "중고거래·동네",
+   "web": "partial",
+   "home": "https://www.daangn.com/",
+   "note": "웹에서는 매물 검색·열람만 가능하고 채팅·거래는 앱 전용"
+  },
+  {
+   "id": "baemin",
+   "name": "배달의민족",
+   "category": "배달",
+   "web": "app_only",
+   "note": "주문 가능한 웹이 없음"
+  },
+  {
+   "id": "coupang_eats",
+   "name": "쿠팡이츠",
+   "category": "배달",
+   "web": "app_only",
+   "note": "주문은 앱 전용"
+  },
+  {
+   "id": "yogiyo",
+   "name": "요기요",
+   "category": "배달",
+   "web": "partial",
+   "home": "https://www.yogiyo.co.kr/",
+   "note": "웹 주문 기능이 제한적일 수 있음"
+  },
+  {
+   "id": "chatgpt",
+   "name": "ChatGPT",
+   "category": "AI",
+   "web": "web",
+   "home": "https://chatgpt.com/",
+   "login": "https://chatgpt.com/auth/login"
+  },
+  {
+   "id": "toss",
+   "name": "토스",
+   "category": "금융",
+   "web": "excluded",
+   "note": "송금·금융 서비스는 보안상 에이전트 자동화에서 제외"
+  },
+  {
+   "id": "kakaobank",
+   "name": "카카오뱅크",
+   "category": "금융",
+   "web": "excluded",
+   "note": "은행 앱은 보안상 제외"
+  },
+  {
+   "id": "kb_star",
+   "name": "KB스타뱅킹",
+   "category": "금융",
+   "web": "excluded",
+   "note": "은행 앱은 보안상 제외"
+  },
+  {
+   "id": "shinhan_sol",
+   "name": "신한 SOL뱅크",
+   "category": "금융",
+   "web": "excluded",
+   "note": "은행 앱은 보안상 제외"
+  },
+  {
+   "id": "woori",
+   "name": "우리WON뱅킹",
+   "category": "금융",
+   "web": "excluded",
+   "note": "은행 앱은 보안상 제외"
+  },
+  {
+   "id": "hana",
+   "name": "하나원큐",
+   "category": "금융",
+   "web": "excluded",
+   "note": "은행 앱은 보안상 제외"
+  },
+  {
+   "id": "kakaopay",
+   "name": "카카오페이",
+   "category": "결제",
+   "web": "excluded",
+   "note": "결제·송금은 보안상 제외"
+  },
+  {
+   "id": "naverpay",
+   "name": "네이버페이 (주문·배송 조회)",
+   "category": "결제",
+   "web": "partial",
+   "home": "https://pay.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "hint": "주문내역·배송 조회만. 결제·송금은 하지 않음",
+   "account": "naver"
+  },
+  {
+   "id": "samsung_wallet",
+   "name": "삼성 월렛",
+   "category": "결제",
+   "web": "app_only",
+   "note": "기기 결제·신분증 기능으로 앱 전용"
+  },
+  {
+   "id": "naver_webtoon",
+   "name": "네이버웹툰",
+   "category": "웹툰",
+   "web": "web",
+   "home": "https://m.comic.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "hint": "관심 웹툰 새 회차 확인",
+   "account": "naver"
+  },
+  {
+   "id": "kakao_page",
+   "name": "카카오페이지",
+   "category": "웹툰·웹소설",
+   "web": "web",
+   "home": "https://page.kakao.com/",
+   "login": "https://accounts.kakao.com/login",
+   "account": "kakao"
+  },
+  {
+   "id": "kakao_webtoon",
+   "name": "카카오웹툰",
+   "category": "웹툰",
+   "web": "web",
+   "home": "https://webtoon.kakao.com/",
+   "login": "https://accounts.kakao.com/login",
+   "account": "kakao"
+  },
+  {
+   "id": "netflix",
+   "name": "넷플릭스",
+   "category": "OTT",
+   "web": "web",
+   "home": "https://www.netflix.com/",
+   "login": "https://www.netflix.com/login",
+   "search": "https://www.netflix.com/search?q={q}",
+   "hint": "찜 목록·신작 확인(재생은 사용자가)"
+  },
+  {
+   "id": "coupang_play",
+   "name": "쿠팡플레이",
+   "category": "OTT",
+   "web": "web",
+   "home": "https://www.coupangplay.com/",
+   "login": "https://login.coupang.com/login/login.pang"
+  },
+  {
+   "id": "tving",
+   "name": "티빙",
+   "category": "OTT",
+   "web": "web",
+   "home": "https://www.tving.com/"
+  },
+  {
+   "id": "wavve",
+   "name": "웨이브",
+   "category": "OTT",
+   "web": "web",
+   "home": "https://www.wavve.com/"
+  },
+  {
+   "id": "disney_plus",
+   "name": "디즈니+",
+   "category": "OTT",
+   "web": "web",
+   "home": "https://www.disneyplus.com/"
+  },
+  {
+   "id": "youtube_music",
+   "name": "YouTube Music",
+   "category": "음악",
+   "web": "web",
+   "home": "https://music.youtube.com/",
+   "login": "https://accounts.google.com/",
+   "search": "https://music.youtube.com/search?q={q}",
+   "hint": "재생목록 만들기·곡 추가",
+   "account": "google"
+  },
+  {
+   "id": "melon",
+   "name": "멜론",
+   "category": "음악",
+   "web": "web",
+   "home": "https://www.melon.com/",
+   "login": "https://accounts.kakao.com/login",
+   "search": "https://www.melon.com/search/total/index.htm?q={q}",
+   "hint": "플레이리스트 관리, 차트 확인",
+   "account": "kakao"
+  },
+  {
+   "id": "genie",
+   "name": "지니뮤직",
+   "category": "음악",
+   "web": "web",
+   "home": "https://www.genie.co.kr/"
+  },
+  {
+   "id": "spotify",
+   "name": "Spotify",
+   "category": "음악",
+   "web": "web",
+   "home": "https://open.spotify.com/",
+   "login": "https://accounts.spotify.com/login",
+   "search": "https://open.spotify.com/search/{q}"
+  },
+  {
+   "id": "band",
+   "name": "네이버 밴드",
+   "category": "SNS·커뮤니티",
+   "web": "web",
+   "home": "https://band.us/",
+   "hint": "공지·일정 확인, 글쓰기는 승인 후",
+   "account": "naver"
+  },
+  {
+   "id": "naver_cafe",
+   "name": "네이버 카페",
+   "category": "커뮤니티",
+   "web": "web",
+   "home": "https://m.cafe.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "hint": "가입한 카페 새 글 확인, 글쓰기는 승인 후",
+   "account": "naver"
+  },
+  {
+   "id": "naver_blog",
+   "name": "네이버 블로그",
+   "category": "블로그",
+   "web": "web",
+   "home": "https://m.blog.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "account": "naver"
+  },
+  {
+   "id": "everytime",
+   "name": "에브리타임",
+   "category": "커뮤니티",
+   "web": "web",
+   "home": "https://everytime.kr/"
+  },
+  {
+   "id": "x",
+   "name": "X (트위터)",
+   "category": "SNS",
+   "web": "web",
+   "home": "https://x.com/",
+   "login": "https://x.com/login",
+   "search": "https://x.com/search?q={q}"
+  },
+  {
+   "id": "facebook",
+   "name": "페이스북",
+   "category": "SNS",
+   "web": "web",
+   "home": "https://m.facebook.com/"
+  },
+  {
+   "id": "threads",
+   "name": "스레드",
+   "category": "SNS",
+   "web": "web",
+   "home": "https://www.threads.com/"
+  },
+  {
+   "id": "tiktok",
+   "name": "틱톡",
+   "category": "숏폼",
+   "web": "web",
+   "home": "https://www.tiktok.com/"
+  },
+  {
+   "id": "chzzk",
+   "name": "치지직",
+   "category": "라이브 방송",
+   "web": "web",
+   "home": "https://chzzk.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "account": "naver"
+  },
+  {
+   "id": "soop",
+   "name": "SOOP (숲)",
+   "category": "라이브 방송",
+   "web": "web",
+   "home": "https://www.sooplive.co.kr/"
+  },
+  {
+   "id": "discord",
+   "name": "디스코드",
+   "category": "메신저",
+   "web": "web",
+   "home": "https://discord.com/app",
+   "login": "https://discord.com/login"
+  },
+  {
+   "id": "ably",
+   "name": "에이블리",
+   "category": "패션",
+   "web": "partial",
+   "home": "https://m.a-bly.com/",
+   "note": "웹 기능이 앱보다 제한적"
+  },
+  {
+   "id": "oliveyoung",
+   "name": "올리브영",
+   "category": "뷰티",
+   "web": "web",
+   "home": "https://www.oliveyoung.co.kr/",
+   "search": "https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query={q}"
+  },
+  {
+   "id": "aliexpress",
+   "name": "알리익스프레스",
+   "category": "해외직구",
+   "web": "web",
+   "home": "https://ko.aliexpress.com/"
+  },
+  {
+   "id": "temu",
+   "name": "테무",
+   "category": "해외직구",
+   "web": "web",
+   "home": "https://www.temu.com/"
+  },
+  {
+   "id": "11st",
+   "name": "11번가",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://m.11st.co.kr/",
+   "search": "https://search.11st.co.kr/Search.tmall?kwd={q}"
+  },
+  {
+   "id": "naver_shopping",
+   "name": "네이버플러스 스토어 (네이버쇼핑)",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://shopping.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "search": "https://search.shopping.naver.com/search/all?query={q}",
+   "hint": "여러 쇼핑몰 가격 비교에 유용",
+   "account": "naver"
+  },
+  {
+   "id": "musinsa",
+   "name": "무신사",
+   "category": "패션",
+   "web": "web",
+   "home": "https://www.musinsa.com/"
+  },
+  {
+   "id": "starbucks",
+   "name": "스타벅스",
+   "category": "카페",
+   "web": "partial",
+   "home": "https://www.starbucks.co.kr/",
+   "note": "사이렌오더(주문)는 앱 전용, 웹은 카드·쿠폰 조회 위주"
+  },
+  {
+   "id": "gmarket",
+   "name": "G마켓",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://www.gmarket.co.kr/",
+   "search": "https://browse.gmarket.co.kr/search?keyword={q}"
+  },
+  {
+   "id": "auction",
+   "name": "옥션",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://www.auction.co.kr/",
+   "search": "https://browse.auction.co.kr/search?keyword={q}"
+  },
+  {
+   "id": "bunjang",
+   "name": "번개장터",
+   "category": "중고거래",
+   "web": "web",
+   "home": "https://m.bunjang.co.kr/",
+   "search": "https://m.bunjang.co.kr/search/products?q={q}",
+   "hint": "구매·채팅은 승인 후"
+  },
+  {
+   "id": "daiso",
+   "name": "다이소몰",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://www.daisomall.co.kr/"
+  },
+  {
+   "id": "kurly",
+   "name": "컬리",
+   "category": "장보기",
+   "web": "web",
+   "home": "https://www.kurly.com/",
+   "search": "https://www.kurly.com/search?sword={q}"
+  },
+  {
+   "id": "gs_shop",
+   "name": "우리동네GS",
+   "category": "편의점",
+   "web": "app_only",
+   "note": "픽업·배달 주문은 앱 전용"
+  },
+  {
+   "id": "zigzag",
+   "name": "지그재그",
+   "category": "패션",
+   "web": "partial",
+   "home": "https://zigzag.kr/",
+   "note": "웹 기능이 앱보다 제한적"
+  },
+  {
+   "id": "ohouse",
+   "name": "오늘의집",
+   "category": "인테리어",
+   "web": "web",
+   "home": "https://ohou.se/",
+   "search": "https://ohou.se/search/index?query={q}"
+  },
+  {
+   "id": "ssg",
+   "name": "SSG.COM (이마트몰)",
+   "category": "쇼핑·장보기",
+   "web": "web",
+   "home": "https://www.ssg.com/",
+   "search": "https://www.ssg.com/search.ssg?query={q}"
+  },
+  {
+   "id": "lotteon",
+   "name": "롯데ON",
+   "category": "쇼핑",
+   "web": "web",
+   "home": "https://www.lotteon.com/"
+  },
+  {
+   "id": "trip",
+   "name": "트립닷컴",
+   "category": "여행",
+   "web": "web",
+   "home": "https://kr.trip.com/"
+  },
+  {
+   "id": "yanolja",
+   "name": "야놀자 (NOL)",
+   "category": "여행·숙박",
+   "web": "web",
+   "home": "https://www.yanolja.com/"
+  },
+  {
+   "id": "yeogi",
+   "name": "여기어때",
+   "category": "여행·숙박",
+   "web": "web",
+   "home": "https://www.yeogi.com/"
+  },
+  {
+   "id": "agoda",
+   "name": "아고다",
+   "category": "여행·숙박",
+   "web": "web",
+   "home": "https://www.agoda.com/ko-kr/"
+  },
+  {
+   "id": "airbnb",
+   "name": "에어비앤비",
+   "category": "여행·숙박",
+   "web": "web",
+   "home": "https://www.airbnb.co.kr/"
+  },
+  {
+   "id": "skyscanner",
+   "name": "스카이스캐너",
+   "category": "항공",
+   "web": "web",
+   "home": "https://www.skyscanner.co.kr/"
+  },
+  {
+   "id": "naver_flight",
+   "name": "네이버 항공권",
+   "category": "항공",
+   "web": "web",
+   "home": "https://flight.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "account": "naver"
+  },
+  {
+   "id": "koreanair",
+   "name": "대한항공",
+   "category": "항공",
+   "web": "web",
+   "home": "https://www.koreanair.com/"
+  },
+  {
+   "id": "asiana",
+   "name": "아시아나항공",
+   "category": "항공",
+   "web": "web",
+   "home": "https://flyasiana.com/"
+  },
+  {
+   "id": "korail",
+   "name": "코레일 (코레일톡)",
+   "category": "기차",
+   "web": "web",
+   "home": "https://www.korail.com/",
+   "hint": "승차권 조회·예매. 반복 조회로 좌석을 노리는 매크로 예매는 금지. 결제는 승인 후"
+  },
+  {
+   "id": "srt",
+   "name": "SRT",
+   "category": "기차",
+   "web": "web",
+   "home": "https://etk.srail.kr/",
+   "hint": "승차권 조회·예매. 매크로 예매 금지. 결제는 승인 후"
+  },
+  {
+   "id": "kobus",
+   "name": "고속버스 (티머니GO/KOBUS)",
+   "category": "버스",
+   "web": "web",
+   "home": "https://www.kobus.co.kr/"
+  },
+  {
+   "id": "kakao_t",
+   "name": "카카오 T",
+   "category": "택시",
+   "web": "app_only",
+   "note": "택시 호출은 위치·앱 전용"
+  },
+  {
+   "id": "socar",
+   "name": "쏘카",
+   "category": "카셰어링",
+   "web": "app_only",
+   "note": "차량 이용은 앱 전용"
+  },
+  {
+   "id": "cgv",
+   "name": "CGV",
+   "category": "영화",
+   "web": "web",
+   "home": "https://www.cgv.co.kr/",
+   "hint": "상영시간 조회·예매. 결제는 승인 후"
+  },
+  {
+   "id": "megabox",
+   "name": "메가박스",
+   "category": "영화",
+   "web": "web",
+   "home": "https://www.megabox.co.kr/"
+  },
+  {
+   "id": "lottecinema",
+   "name": "롯데시네마",
+   "category": "영화",
+   "web": "web",
+   "home": "https://www.lottecinema.co.kr/"
+  },
+  {
+   "id": "interpark_ticket",
+   "name": "NOL 티켓 (인터파크 티켓)",
+   "category": "공연·티켓",
+   "web": "web",
+   "home": "https://tickets.interpark.com/",
+   "hint": "공연 정보·예매. 대기열·매크로 우회는 하지 않음"
+  },
+  {
+   "id": "catchtable",
+   "name": "캐치테이블",
+   "category": "식당 예약",
+   "web": "web",
+   "home": "https://app.catchtable.co.kr/"
+  },
+  {
+   "id": "yes24",
+   "name": "예스24",
+   "category": "도서·티켓",
+   "web": "web",
+   "home": "https://www.yes24.com/",
+   "search": "https://www.yes24.com/Product/Search?query={q}"
+  },
+  {
+   "id": "kyobo",
+   "name": "교보문고",
+   "category": "도서",
+   "web": "web",
+   "home": "https://www.kyobobook.co.kr/",
+   "search": "https://search.kyobobook.co.kr/search?keyword={q}"
+  },
+  {
+   "id": "aladin",
+   "name": "알라딘",
+   "category": "도서",
+   "web": "web",
+   "home": "https://www.aladin.co.kr/",
+   "search": "https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord={q}"
+  },
+  {
+   "id": "millie",
+   "name": "밀리의 서재",
+   "category": "전자책",
+   "web": "web",
+   "home": "https://www.millie.co.kr/"
+  },
+  {
+   "id": "ridi",
+   "name": "리디",
+   "category": "전자책",
+   "web": "web",
+   "home": "https://ridibooks.com/"
+  },
+  {
+   "id": "gmail",
+   "name": "Gmail",
+   "category": "메일",
+   "web": "web",
+   "home": "https://mail.google.com/",
+   "login": "https://accounts.google.com/",
+   "hint": "'이 폰' 모드에서는 Gmail API(말투 학습 포함)로 처리됨. 전송은 승인 후",
+   "account": "google"
+  },
+  {
+   "id": "naver_mail",
+   "name": "네이버 메일",
+   "category": "메일",
+   "web": "web",
+   "home": "https://mail.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "hint": "메일 확인·요약, 전송은 승인 후",
+   "account": "naver"
+  },
+  {
+   "id": "daum",
+   "name": "다음·다음 메일",
+   "category": "포털·메일",
+   "web": "web",
+   "home": "https://m.daum.net/",
+   "login": "https://accounts.kakao.com/login",
+   "search": "https://m.search.daum.net/search?q={q}",
+   "hint": "메일: https://mail.daum.net/",
+   "account": "kakao"
+  },
+  {
+   "id": "google_calendar",
+   "name": "Google 캘린더",
+   "category": "일정",
+   "web": "web",
+   "home": "https://calendar.google.com/",
+   "login": "https://accounts.google.com/",
+   "hint": "일정 확인·등록",
+   "account": "google"
+  },
+  {
+   "id": "naver_calendar",
+   "name": "네이버 캘린더",
+   "category": "일정",
+   "web": "web",
+   "home": "https://calendar.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "account": "naver"
+  },
+  {
+   "id": "google_drive",
+   "name": "Google 드라이브",
+   "category": "파일",
+   "web": "web",
+   "home": "https://drive.google.com/",
+   "login": "https://accounts.google.com/",
+   "account": "google"
+  },
+  {
+   "id": "naver_land",
+   "name": "네이버 부동산",
+   "category": "부동산",
+   "web": "web",
+   "home": "https://land.naver.com/",
+   "login": "https://nid.naver.com/nidlogin.login",
+   "account": "naver"
+  },
+  {
+   "id": "zigbang",
+   "name": "직방",
+   "category": "부동산",
+   "web": "web",
+   "home": "https://www.zigbang.com/"
+  },
+  {
+   "id": "dabang",
+   "name": "다방",
+   "category": "부동산",
+   "web": "web",
+   "home": "https://www.dabangapp.com/"
+  },
+  {
+   "id": "hogangnono",
+   "name": "호갱노노",
+   "category": "부동산",
+   "web": "web",
+   "home": "https://hogangnono.com/"
+  },
+  {
+   "id": "saramin",
+   "name": "사람인",
+   "category": "채용",
+   "web": "web",
+   "home": "https://www.saramin.co.kr/",
+   "search": "https://www.saramin.co.kr/zf_user/search?searchword={q}",
+   "hint": "지원서 제출은 승인 후"
+  },
+  {
+   "id": "jobkorea",
+   "name": "잡코리아",
+   "category": "채용",
+   "web": "web",
+   "home": "https://www.jobkorea.co.kr/",
+   "search": "https://www.jobkorea.co.kr/Search/?stext={q}",
+   "hint": "지원서 제출은 승인 후"
+  },
+  {
+   "id": "albamon",
+   "name": "알바몬",
+   "category": "아르바이트",
+   "web": "web",
+   "home": "https://www.albamon.com/"
+  },
+  {
+   "id": "alba",
+   "name": "알바천국",
+   "category": "아르바이트",
+   "web": "web",
+   "home": "https://www.alba.co.kr/"
+  },
+  {
+   "id": "gov24",
+   "name": "정부24",
+   "category": "공공",
+   "web": "partial",
+   "home": "https://www.gov.kr/",
+   "hint": "민원 조회·신청 안내. 본인인증·발급은 사용자에게 넘김",
+   "note": "본인인증(간편인증·공동인증서)은 사용자가 직접"
+  },
+  {
+   "id": "hometax",
+   "name": "홈택스",
+   "category": "공공",
+   "web": "partial",
+   "home": "https://www.hometax.go.kr/",
+   "hint": "조회 위주. 로그인·신고 제출은 사용자 확인 필요",
+   "note": "본인인증·신고 제출은 사용자가 직접"
+  },
+  {
+   "id": "nhis",
+   "name": "국민건강보험",
+   "category": "공공",
+   "web": "partial",
+   "home": "https://www.nhis.or.kr/",
+   "note": "본인인증 필요, 조회 위주"
+  },
+  {
+   "id": "ddocdoc",
+   "name": "똑닥",
+   "category": "병원 예약",
+   "web": "app_only",
+   "note": "접수·예약은 앱 전용"
+  },
+  {
+   "id": "pass",
+   "name": "PASS",
+   "category": "본인인증",
+   "web": "excluded",
+   "note": "본인인증 앱은 보안상 제외"
+  },
+  {
+   "id": "mobile_id",
+   "name": "모바일 신분증",
+   "category": "공공",
+   "web": "excluded",
+   "note": "신분증은 보안상 제외"
+  }
+ ]
+}

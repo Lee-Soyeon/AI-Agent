@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../browser/agent_browser.dart';
 import '../browser/session_store.dart';
@@ -10,7 +12,9 @@ import '../core/settings_store.dart';
 import '../google/gmail_api.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
+import '../llm/llm_types.dart';
 import '../remote/agent_server_client.dart';
+import '../services/service_catalog.dart';
 import '../ui/browser_screen.dart';
 import '../ui/remote_browser_screen.dart';
 import 'agent_models.dart';
@@ -26,8 +30,9 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     required this.google,
     required this.writingStyle,
     required this.navigatorKey,
-    ChatSessionStore? history,
-  }) : history = history ?? ChatSessionStore.memory() {
+    this.catalog,
+    ChatHistoryFiles? historyFiles,
+  }) : historyFiles = historyFiles ?? ChatHistoryFiles() {
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -35,20 +40,38 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   final SiteSessionStore sessions;
   final GoogleAuthService google;
   final WritingStyleStore writingStyle;
+  final ServiceCatalog? catalog;
   final GlobalKey<NavigatorState> navigatorKey;
 
-  /// 지난 대화 목록. 끝난 대화도 남겨 두었다가 다시 열어 이어서 지시할 수 있다.
-  final ChatSessionStore history;
+  /// 이 폰에서 실행한 대화의 LLM 메시지 저장소 (앱을 다시 켠 뒤 이어서 지시할 때 쓴다).
+  final ChatHistoryFiles historyFiles;
 
   final AgentBrowser _browser = AgentBrowser();
-  AgentRunner? _runner;
 
-  /// 지금 화면에 열려 있는 대화. 에이전트는 이 대화에서만 실행된다.
-  ChatSession? current;
+  // ---- 채팅 세션 ----
+  static const _sessionsKey = 'chat_sessions';
+  static const _maxSavedSessions = 50;
 
-  AgentStatus status = AgentStatus.idle;
+  /// 시작한 대화 목록 (최근 것이 앞). 아직 아무것도 시키지 않은 새 채팅은 들어가지 않는다.
+  final List<ChatSession> chats = [];
+  ChatSession _current = ChatSession(id: _newId());
+  Timer? _saveTimer;
+
+  /// LLM 대화가 바뀌어 파일로 다시 저장해야 하는 대화 (이 폰에서 실행 중인 것).
+  final Set<ChatSession> _historyDirty = {};
+
+  /// 지금 화면에 보이는(작업 중인) 대화.
+  ChatSession get current => _current;
+
+  List<AgentLogEntry> get logs => _current.logs;
+  AgentStatus get status => _current.status;
+  set status(AgentStatus s) => _current.status = s;
+  String? get lastResult => _current.lastResult;
+  set lastResult(String? r) => _current.lastResult = r;
+  AgentRunner? get _runner => _current.runner;
+  set _runner(AgentRunner? r) => _current.runner = r;
+
   Uint8List? lastScreenshot;
-  String? lastResult;
   ApprovalRequest? pendingApproval;
   UserQuestion? pendingQuestion;
   String? helpReason;
@@ -58,18 +81,11 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       status == AgentStatus.waitingApproval ||
       status == AgentStatus.waitingUser;
 
-  List<AgentLogEntry> get logs => current?.logs ?? const [];
-
-  /// 이어서 지시할 수 있는지. 서버 대화는 서버에 기록이 남아 있어야 한다.
-  bool get hasConversation {
-    final s = current;
-    if (s == null) return false;
-    return !s.isRemote || _remoteTaskId != null;
-  }
+  bool get hasConversation => _current.canContinue;
 
   // ---- 서버 모드 (server/) ----
   AgentServerClient? _server;
-  String? _remoteTaskId;
+  String? get _remoteTaskId => _current.remoteTaskId;
   int _remoteShotVersion = 0;
   Timer? _poll;
   bool _polling = false;
@@ -78,27 +94,129 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   bool get isRemote => _remoteTaskId != null;
 
-  /// 새 대화로 작업을 시작한다. 이전 대화는 목록에 남는다.
+  static String _newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+
+  /// 저장해 둔 대화 목록을 불러온 뒤, 서버에서 진행 중인 작업이 있으면 붙는다.
+  Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_sessionsKey);
+      if (raw != null) {
+        chats
+          ..clear()
+          ..addAll([
+            for (final j in jsonDecode(raw) as List)
+              ChatSession.fromJson((j as Map).cast<String, dynamic>()),
+          ]);
+      }
+    } catch (_) {
+      // 저장본이 깨졌으면 빈 목록으로 시작한다.
+    }
+    notifyListeners();
+    await attachToServer();
+  }
+
+  /// 새 채팅을 연다 (진행 중인 작업이 있으면 열 수 없다).
+  void newSession() {
+    if (isBusy || _current.isEmpty) return;
+    _switchTo(ChatSession(id: _newId()));
+  }
+
+  /// 목록에서 고른 대화를 연다. 서버 작업이면 서버에서 최신 상태를 받아 온다.
+  void openSession(String id) {
+    if (id == _current.id) return;
+    if (isBusy) return;
+    final s = chats.where((e) => e.id == id).firstOrNull;
+    if (s == null) return;
+    _switchTo(s);
+    if (s.remoteTaskId != null) {
+      _server = settings.serverClient;
+      if (_server != null) _refreshRemote();
+    }
+  }
+
+  void deleteSession(String id) {
+    if (id == _current.id && isBusy) return;
+    final s = chats.where((e) => e.id == id).firstOrNull;
+    final taskId = s?.remoteTaskId;
+    final client = settings.serverClient;
+    if (taskId != null && client != null) {
+      unawaited(client.deleteTask(taskId).catchError((_) {})); // 서버 기록도 지운다 (실패해도 무시)
+    }
+    unawaited(historyFiles.delete(id));
+    chats.removeWhere((e) => e.id == id);
+    if (id == _current.id) _switchTo(ChatSession(id: _newId()));
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  void _switchTo(ChatSession s) {
+    _stopRemote();
+    _current = s;
+    lastScreenshot = null;
+    pendingApproval = null;
+    pendingQuestion = null;
+    _remoteShotVersion = 0;
+    _lastPollError = null;
+    notifyListeners();
+  }
+
+  /// 현재 대화를 목록 맨 위로 올리고 저장을 예약한다.
+  void _touch([ChatSession? session]) {
+    final s = session ?? _current;
+    s.updatedAt = DateTime.now();
+    chats.remove(s);
+    chats.insert(0, s);
+    _scheduleSave();
+  }
+
+  void _scheduleSave() {
+    if (_current.runner != null) _historyDirty.add(_current);
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 800), _save);
+  }
+
+  Future<void> _save() async {
+    // 이 폰에서 실행한 대화는 LLM 대화도 저장해 두어야 앱을 다시 켠 뒤 이어서 지시할 수 있다.
+    final dirty = _historyDirty.toList();
+    _historyDirty.clear();
+    for (final s in dirty) {
+      final runner = s.runner;
+      if (runner == null || !chats.contains(s)) continue;
+      if (await historyFiles.save(s.id, List.of(runner.messages))) s.hasSavedHistory = true;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _sessionsKey,
+        jsonEncode([for (final s in chats.take(_maxSavedSessions)) s.toJson()]),
+      );
+    } catch (_) {
+      // 저장 실패는 다음 변경 때 다시 시도된다.
+    }
+  }
+
+  /// 새 작업을 시작한다. 현재 대화에 이미 기록이 있으면 새 채팅으로 시작한다.
   Future<void> startTask(String task) async {
     if (isBusy) return;
-    _stopRemote();
-    _runner = null;
-    final s = ChatSession.create(task, vendor: settings.runOnServer ? null : settings.vendor.name);
-    _select(s);
-    history.add(s);
+    if (!_current.isEmpty) _switchTo(ChatSession(id: _newId()));
+    _current.title = ChatSession.titleFrom(task);
+    _touch();
     if (settings.runOnServer) return _startRemote(task);
-    _runner = _newRunner(s);
+    _stopRemote();
+    _runner = _newRunner(_current);
     await _run(task);
   }
 
-  AgentRunner _newRunner(ChatSession s) {
+  /// 이 폰에서 실행할 실행기. [history] 가 있으면 저장해 둔 대화에 이어서 쌓는다.
+  AgentRunner _newRunner(ChatSession s, [List<ChatMessage>? history]) {
     // 다른 LLM 공급자로 이어가면, 이전 공급자 형식의 원본 응답은 보낼 수 없으므로 버린다.
-    if (s.vendor != settings.vendor.name) {
-      for (var i = 0; i < s.messages.length; i++) {
-        s.messages[i] = s.messages[i].withoutProviderRaw();
+    if (history != null && s.vendor != settings.vendor.name) {
+      for (var i = 0; i < history.length; i++) {
+        history[i] = history[i].withoutProviderRaw();
       }
-      s.vendor = settings.vendor.name;
     }
+    s.vendor = settings.vendor.name;
     return AgentRunner(
       llm: settings.createProvider(),
       browser: _browser,
@@ -106,83 +224,15 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       maxSteps: settings.maxSteps,
       gmail: google.isSignedIn ? GmailApi(authHeaders: google.authHeaders) : null,
       gmailAddress: google.email,
-      history: s.messages,
+      catalog: catalog,
       systemPrompt: buildSystemPrompt(
         loginState: {for (final s in allSites) s: sessions.isLoggedIn(s)},
         gmailAccount: google.email,
         styleGuide: writingStyle.profile?.guide,
+        serviceIndex: catalog?.promptIndex(),
       ),
+      history: history,
     );
-  }
-
-  /// 지난 대화를 연다. 다른 대화에서 작업이 진행 중이면 열지 못하고 false 를 돌려준다.
-  Future<bool> openSession(String id) async {
-    final s = history.byId(id);
-    if (s == null) return false;
-    if (current?.id == id) return true;
-    if (isBusy) return false;
-    _stopRemote();
-    _runner = null;
-    _select(s);
-    notifyListeners();
-    lastScreenshot = await history.loadScreenshot(s);
-    if (current != s) return true; // 읽는 사이에 다른 대화로 바뀜
-    final client = settings.serverClient;
-    if (s.isRemote && client != null) {
-      // 앱에 받아 둔 로그 다음부터 서버에서 이어 받는다 (그 사이 서버에서 진행된 내용 포함).
-      _server = client;
-      _remoteTaskId = s.remoteTaskId;
-      _remoteShotVersion = 0;
-      _startPolling();
-      await _refreshRemote();
-    }
-    notifyListeners();
-    return true;
-  }
-
-  /// 열린 대화를 닫고 새 대화를 준비한다 (목록에는 남는다).
-  void closeSession() {
-    if (isBusy) return;
-    _stopRemote();
-    _runner = null;
-    _select(null);
-    notifyListeners();
-  }
-
-  /// 대화를 목록에서 지운다. 진행 중인 대화는 지울 수 없다.
-  Future<bool> deleteSession(String id) async {
-    final s = history.byId(id);
-    if (s == null) return true;
-    if (current?.id == id) {
-      if (isBusy) return false;
-      closeSession();
-    }
-    final taskId = s.remoteTaskId;
-    final client = settings.serverClient;
-    if (taskId != null && client != null) {
-      unawaited(client.deleteTask(taskId).catchError((_) {})); // 서버 기록도 지운다 (실패해도 무시)
-    }
-    await history.delete(id);
-    notifyListeners();
-    return true;
-  }
-
-  void _select(ChatSession? s) {
-    current = s;
-    status = s?.status ?? AgentStatus.idle;
-    lastResult = s?.lastResult;
-    lastScreenshot = s?.screenshot;
-    pendingApproval = null;
-    pendingQuestion = null;
-    _lastPollError = null;
-  }
-
-  void _log(AgentLogEntry entry) {
-    final s = current;
-    if (s == null) return;
-    s.logs.add(entry);
-    history.save(s);
-    notifyListeners();
   }
 
   /// 보낸 메일함을 분석해 말투를 학습한다 (현재 선택된 LLM 사용).
@@ -196,37 +246,39 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   /// 같은 대화를 이어서 지시한다 (예: "두 번째 메일에 답장 써줘").
   Future<void> followUp(String message) async {
-    final s = current;
-    if (isBusy || s == null) return;
+    if (isBusy) return;
     lastResult = null;
-    if (s.isRemote) {
-      if (!isRemote) return;
+    if (isRemote) {
       await _remoteCall(() => _server!.followUp(_remoteTaskId!, message));
       status = AgentStatus.running;
       _startPolling();
       return;
     }
-    if (_runner == null) {
-      // 앱을 다시 켠 뒤 지난 대화를 이어가는 경우: 저장된 LLM 대화로 실행기를 다시 만든다.
+    final session = _current;
+    if (session.runner == null && session.remoteTaskId == null && session.hasSavedHistory) {
+      // 앱을 다시 켠 뒤 지난 대화를 이어가는 경우: 저장해 둔 LLM 대화로 실행기를 되살린다.
       if (!settings.isLocalLlmConfigured) {
-        _log(AgentLogEntry(LogKind.error, '이어서 지시하려면 설정에서 LLM 을 먼저 설정하세요.'));
+        onLog(AgentLogEntry(LogKind.error, '이어서 지시하려면 먼저 LLM 을 설정하세요.'));
         return;
       }
-      _runner = _newRunner(s);
+      final saved = await historyFiles.load(session.id);
+      if (!identical(session, _current) || isBusy) return; // 읽는 사이 다른 대화로 바뀜
+      if (saved == null) {
+        session.hasSavedHistory = false;
+        onLog(AgentLogEntry(LogKind.error, '저장된 대화를 읽지 못해 이어갈 수 없습니다. 새 채팅으로 시작하세요.'));
+        return;
+      }
+      session.runner = _newRunner(session, saved);
     }
+    if (_runner == null) return;
     await _run(message);
   }
 
   Future<void> _run(String message) async {
-    final s = current;
-    final r = await _runner!.run(message);
-    if (r != null) {
-      lastResult = r;
-      if (s != null) {
-        s.lastResult = r;
-        history.save(s);
-      }
-    }
+    final session = _current;
+    final r = await session.runner!.run(message);
+    if (r != null) session.lastResult = r;
+    _touch(session);
     notifyListeners();
   }
 
@@ -281,28 +333,22 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   // ---- AgentHooks ----
 
   @override
-  void onLog(AgentLogEntry entry) => _log(entry);
+  void onLog(AgentLogEntry entry) {
+    logs.add(entry);
+    _scheduleSave();
+    notifyListeners();
+  }
 
   @override
   void onStatus(AgentStatus s) {
     status = s;
-    final c = current;
-    if (c != null) {
-      c.status = s;
-      history.save(c, touch: false);
-    }
+    _touch();
     notifyListeners();
   }
 
   @override
   void onScreenshot(List<int> jpeg) {
     lastScreenshot = Uint8List.fromList(jpeg);
-    final c = current;
-    if (c != null) {
-      c.screenshot = lastScreenshot;
-      c.screenshotDirty = true;
-      history.save(c, touch: false);
-    }
     notifyListeners();
   }
 
@@ -351,18 +397,20 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     final client = settings.serverClient;
     if (client == null) return;
     _server = client;
-    onStatus(AgentStatus.running);
-    _log(AgentLogEntry(LogKind.user, prompt));
+    status = AgentStatus.running;
+    logs.add(AgentLogEntry(LogKind.user, prompt));
+    notifyListeners();
     try {
       final t = await client.createTask(prompt);
       _adopt(t);
     } catch (e) {
-      _log(AgentLogEntry(LogKind.error, '서버에 작업을 보내지 못했습니다: $e'));
-      onStatus(AgentStatus.failed);
+      logs.add(AgentLogEntry(LogKind.error, '서버에 작업을 보내지 못했습니다: $e'));
+      status = AgentStatus.failed;
+      notifyListeners();
     }
   }
 
-  /// 앱을 켜거나 다시 열었을 때, 서버에서 진행 중인 작업이 있으면 그 대화를 열어 이어서 보여준다.
+  /// 앱을 켜거나 다시 열었을 때, 서버에서 진행 중인 작업이 있으면 이어서 보여준다.
   Future<void> attachToServer() async {
     if (!settings.runOnServer) return;
     final client = settings.serverClient;
@@ -376,36 +424,40 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
         return;
       }
       if (isBusy) return;
-      var s = history.byRemoteTaskId(t.id);
-      // 이미 목록에 있는 끝난 대화라면, 사용자가 보던 대화를 바꾸지 않는다.
-      if (s != null && !t.isBusy) return;
-      if (s == null) {
-        s = ChatSession.create(t.prompt, remoteTaskId: t.id);
-        history.add(s);
+      final known = chats.where((s) => s.remoteTaskId == t.id).firstOrNull;
+      final active = const {'running', 'waiting_approval', 'waiting_user'}.contains(t.status);
+      if (known != null) {
+        // 이미 목록에 있는 작업: 아직 진행 중일 때만 그 대화로 넘어간다.
+        if (!active) return;
+        _switchTo(known);
+        _server = client;
+        _startPolling();
+        await _refreshRemote();
+        return;
       }
-      _stopRemote();
-      _runner = null;
-      _select(s);
+      // 다른 곳에서 시작한 서버 작업: 새 대화로 목록에 추가한다.
+      _switchTo(
+        ChatSession(
+          id: _newId(),
+          title: t.prompt.trim().isEmpty ? _remoteTitle : ChatSession.titleFrom(t.prompt),
+        ),
+      );
       _server = client;
-      _remoteTaskId = t.id;
-      _remoteShotVersion = 0;
-      _startPolling();
-      await _refreshRemote();
+      _touch();
+      _adopt(t);
     } catch (_) {
       // 서버에 닿지 않으면 조용히 넘어간다 (설정 화면의 연결 테스트로 확인)
     }
   }
 
-  /// 방금 만든 서버 작업을 현재 대화에 연결한다. 로그는 서버에서 처음부터 받는다.
+  static const _remoteTitle = '서버 작업';
+
   void _adopt(RemoteTask t) {
-    final s = current!;
     _runner = null;
-    s.remoteTaskId = t.id;
-    s.remoteLogCount = 0;
-    s.logs.clear();
-    history.save(s);
-    _remoteTaskId = t.id;
+    _current.remoteTaskId = t.id;
+    _current.remoteLogCount = 0;
     _remoteShotVersion = 0;
+    logs.clear();
     _startPolling();
     _refreshRemote();
   }
@@ -415,36 +467,34 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     _poll = Timer.periodic(const Duration(milliseconds: 1500), (_) => _refreshRemote());
   }
 
+  /// 폴링만 멈춘다. 서버 작업 id 는 대화(ChatSession)에 남아 나중에 이어서 볼 수 있다.
   void _stopRemote() {
     _poll?.cancel();
     _poll = null;
-    _remoteTaskId = null;
   }
 
   Future<void> _refreshRemote() async {
     final client = _server;
-    final id = _remoteTaskId;
-    final s = current;
-    if (client == null || id == null || s == null || _polling) return;
+    final session = _current;
+    final id = session.remoteTaskId;
+    if (client == null || id == null || _polling) return;
     _polling = true;
     try {
-      final t = await client.task(id, since: s.remoteLogCount);
-      if (current != s) return; // 기다리는 사이 다른 대화로 바뀜
+      final t = await client.task(id, since: session.remoteLogCount);
+      // 기다리는 사이 다른 대화로 넘어갔으면 버린다 (그 대화를 다시 열 때 받아 온다).
+      if (!identical(session, _current)) return;
       _lastPollError = null;
       for (final l in t.logs) {
         final kind = LogKind.values.asNameMap()[l['kind']] ?? LogKind.observation;
-        s.logs.add(
-          AgentLogEntry(
-            kind,
-            '${l['text'] ?? ''}',
-            detail: l['detail'] as String?,
-            time: DateTime.tryParse('${l['time']}'),
-          ),
-        );
+        final text = '${l['text'] ?? ''}';
+        logs.add(AgentLogEntry(kind, text, detail: l['detail'] as String?));
+        if (kind == LogKind.user && session.title == _remoteTitle) {
+          session.title = ChatSession.titleFrom(text);
+        }
       }
-      final before = s.status;
-      final hadNew = t.logs.isNotEmpty;
-      s.remoteLogCount = t.logCount;
+      final changed = t.logs.isNotEmpty || session.remoteLogCount != t.logCount;
+      session.remoteLogCount = t.logCount;
+      final before = status;
       status = switch (t.status) {
         'waiting_approval' => AgentStatus.waitingApproval,
         'waiting_user' => AgentStatus.waitingUser,
@@ -454,32 +504,29 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
         _ => AgentStatus.running,
       };
       if (t.result != null) lastResult = t.result;
-      s.status = status;
-      s.lastResult = lastResult;
       _applyPending(t.pending);
       if (t.screenshotVersion != _remoteShotVersion) {
         _remoteShotVersion = t.screenshotVersion;
-        final shot = await client.screenshot(id);
-        if (shot != null) {
-          lastScreenshot = s.screenshot = shot;
-          s.screenshotDirty = true;
-        }
+        lastScreenshot = await client.screenshot(id) ?? lastScreenshot;
       }
-      if (hadNew || before != s.status || s.screenshotDirty) history.save(s, touch: hadNew);
+      if (changed || status != before) _touch(session);
       if (!isBusy) _poll?.cancel(); // 끝난 작업은 더 묻지 않는다 (후속 지시 때 다시 시작)
     } on AgentServerException catch (e) {
-      if (e.statusCode == 404 && current == s) {
-        // 서버가 초기화되어 기록이 없어졌다. 앱에 받아 둔 기록만 보여준다.
+      if (!identical(session, _current)) return;
+      if (e.statusCode == 404) {
+        // 서버가 초기화되어 기록이 없어졌다. 받아 둔 로그만 남기고 이어서 지시는 막는다.
         _poll?.cancel();
-        _remoteTaskId = null;
+        session.remoteTaskId = null;
         pendingApproval = null;
         pendingQuestion = null;
-        if (isBusy) onStatus(AgentStatus.failed);
-        _log(AgentLogEntry(LogKind.error, '서버에 이 대화 기록이 없어 이어서 지시할 수 없습니다. 새 작업으로 시작하세요.'));
+        if (isBusy) status = AgentStatus.failed;
+        logs.add(AgentLogEntry(LogKind.error, '서버에 이 대화 기록이 없어 이어서 지시할 수 없습니다. 새 채팅으로 시작하세요.'));
+        _touch(session);
       } else {
         _pollError(e);
       }
     } catch (e) {
+      if (!identical(session, _current)) return;
       _pollError(e);
     } finally {
       _polling = false;
@@ -489,7 +536,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   void _pollError(Object e) {
     final msg = '서버 연결 문제: $e';
-    if (msg != _lastPollError) _log(AgentLogEntry(LogKind.error, msg));
+    if (msg != _lastPollError) logs.add(AgentLogEntry(LogKind.error, msg));
     _lastPollError = msg;
   }
 
@@ -545,7 +592,8 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     try {
       await fn();
     } catch (e) {
-      _log(AgentLogEntry(LogKind.error, '서버 요청 실패: $e'));
+      logs.add(AgentLogEntry(LogKind.error, '서버 요청 실패: $e'));
+      notifyListeners();
     }
     _startPolling();
     await _refreshRemote();
@@ -557,7 +605,10 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       attachToServer();
     } else if (state == AppLifecycleState.paused) {
       _poll?.cancel(); // 앱이 백그라운드면 폴링을 멈춘다 (작업은 서버에서 계속된다)
-      history.flush(); // 앱이 종료되어도 대화가 남도록 바로 저장한다
+      if (_saveTimer?.isActive ?? false) {
+        _saveTimer!.cancel();
+        _save(); // 앱이 종료되어도 대화가 남도록 바로 저장한다
+      }
     }
   }
 
@@ -565,6 +616,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
+    _saveTimer?.cancel();
     _browser.dispose();
     super.dispose();
   }

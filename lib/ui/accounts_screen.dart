@@ -1,48 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../agent/agent_controller.dart';
-import '../agent/agent_models.dart';
-import '../agent/chat_session.dart';
 import '../browser/session_store.dart';
 import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
-import '../openai/chatgpt_auth.dart';
+import '../services/service_catalog.dart';
+import 'app_theme.dart';
 import 'browser_screen.dart';
-import 'history_screen.dart';
+import 'main_shell.dart';
 import 'remote_browser_screen.dart';
-import 'settings_screen.dart';
-import 'task_screen.dart';
+import 'services_screen.dart';
 import 'writing_style_screen.dart';
 
-const _examples = [
-  '쿠팡에서 삼다수 2L 12개 로켓배송 제일 싼 걸 장바구니에 담고, 결제 전에 나한테 승인 받아줘',
-  '쿠팡 장바구니에 뭐가 들어있는지 알려줘',
-  'Gmail 에서 안 읽은 메일 5개 요약해줘',
-  'Gmail 에서 가장 최근 메일에 "확인했습니다, 감사합니다" 라고 답장 써서 승인 받고 보내줘',
-  '안 읽은 메일 중 답장이 필요한 것에 평소 내 말투로 답장 초안 써줘',
-];
+/// 로그인 탭: 에이전트가 대신 쓸 서비스에 로그인하고 관리한다.
+class AccountsScreen extends StatelessWidget {
+  const AccountsScreen({super.key});
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final _task = TextEditingController();
-
-  @override
-  void dispose() {
-    _task.dispose();
-    super.dispose();
-  }
-
-  Future<void> _login(SiteConfig site) async {
+  Future<void> _login(BuildContext context, SiteConfig site) async {
     final sessions = context.read<SiteSessionStore>();
+    final messenger = ScaffoldMessenger.of(context);
     final url = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => BrowserScreen(
@@ -55,80 +33,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (url != null && site.isLoggedInUrl(url)) {
       await sessions.markLoggedIn(site);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${site.name} 로그인 완료')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('${site.name} 로그인 완료')));
     }
   }
-
-  Future<void> _start() async {
-    final text = _task.text.trim();
-    if (text.isEmpty) return;
-    final settings = context.read<SettingsStore>();
-    if (!settings.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('먼저 설정에서 LLM API 키를 입력하세요.'),
-          action: SnackBarAction(label: '설정', onPressed: _openSettings),
-        ),
-      );
-      return;
-    }
-    final agent = context.read<AgentController>();
-    FocusScope.of(context).unfocus();
-    _task.clear();
-    // 작업은 백그라운드에서 돌고, 화면은 진행 상황을 보여준다.
-    agent.startTask(text);
-    _openTask();
-  }
-
-  void _openTask() =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen()));
-
-  void _openHistory() =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
-
-  void _openSettings() =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsStore>();
     final sessions = context.watch<SiteSessionStore>();
-    final agent = context.watch<AgentController>();
     final google = context.watch<GoogleAuthService>();
-    final chats = context.watch<ChatSessionStore>().sessions;
-    context.watch<ChatGptAuth>(); // ChatGPT 로그인 상태가 바뀌면 LLM 카드를 갱신
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Agent'),
-        actions: [
-          IconButton(icon: const Icon(Icons.history), tooltip: '대화 기록', onPressed: _openHistory),
-          IconButton(icon: const Icon(Icons.settings), onPressed: _openSettings),
-        ],
-      ),
+      appBar: AppBar(title: const Text('로그인 관리')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: tabListPadding(context),
         children: [
-          if (agent.status != AgentStatus.idle) _ActiveTaskBanner(agent: agent, onTap: _openTask),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: Text(settings.runOnServer ? '서버에서 실행 (백그라운드)' : settings.vendor.label),
-              subtitle: Text(
-                settings.isConfigured
-                    ? (settings.runOnServer
-                          ? settings.serverUrl
-                          : '모델: ${settings.model(settings.vendor)}')
-                    : settings.runOnServer
-                    ? '서버 주소와 토큰을 설정하세요'
-                    : 'API 키가 설정되지 않았습니다',
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _openSettings,
-            ),
+          Text(
+            settings.runOnServer
+                ? '서버에서 실행 중입니다. 서버 브라우저에서 사용할 서비스에 한 번만 로그인해 두면 서버에 유지됩니다.'
+                : '로그인은 직접 하고, 나머지는 에이전트가 합니다. 비밀번호는 앱이 저장하지 않습니다.',
+            style: TextStyle(color: AppTokens.of(context).muted, fontSize: 13.5, height: 1.5),
           ),
           const SizedBox(height: 16),
           Text('연결된 서비스', style: theme.textTheme.titleMedium),
@@ -138,66 +63,48 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final site in allSites)
               Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: site.color,
-                    foregroundColor: Colors.white,
-                    child: Icon(site.icon),
-                  ),
+                  leading: CircleAvatar(child: Icon(site.icon)),
                   title: Text(site.name),
                   subtitle: Text(sessions.isLoggedIn(site) ? '로그인됨' : '로그인이 필요합니다'),
                   trailing: sessions.isLoggedIn(site)
                       ? PopupMenuButton<String>(
-                          onSelected: (v) => v == 'logout' ? sessions.logout(site) : _login(site),
+                          onSelected: (v) =>
+                              v == 'logout' ? sessions.logout(site) : _login(context, site),
                           itemBuilder: (_) => const [
                             PopupMenuItem(value: 'login', child: Text('다시 로그인')),
                             PopupMenuItem(value: 'logout', child: Text('로그아웃')),
                           ],
                         )
-                      : FilledButton.tonal(onPressed: () => _login(site), child: const Text('로그인')),
+                      : FilledButton.tonal(
+                          onPressed: () => _login(context, site),
+                          child: const Text('로그인'),
+                        ),
                 ),
               ),
           if (!settings.runOnServer) _GmailCard(google: google),
-          const SizedBox(height: 16),
-          Text('무엇을 해드릴까요?', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _task,
-            minLines: 3,
-            maxLines: 6,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: '예) 쿠팡에서 휴지 30롤 담아줘',
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.apps)),
+              title: const Text('한국 주요 서비스'),
+              subtitle: Text(
+                '브라우저로 되는 ${context.read<ServiceCatalog>().supported.length}개 서비스 — 탭해서 로그인',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
             ),
           ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: agent.isBusy ? null : _start,
-            icon: const Icon(Icons.play_arrow),
-            label: Text(agent.isBusy ? '작업 진행 중…' : '실행'),
-          ),
-          if (chats.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: Text('최근 대화', style: theme.textTheme.titleMedium)),
-                TextButton(onPressed: _openHistory, child: Text('전체 보기 (${chats.length})')),
-              ],
-            ),
-            Card(
-              child: Column(children: [for (final s in chats.take(3)) ChatSessionTile(session: s)]),
-            ),
-          ],
           const SizedBox(height: 16),
-          Text('예시', style: theme.textTheme.labelLarge),
-          const SizedBox(height: 4),
-          for (final e in _examples)
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.lightbulb_outline, size: 20),
-              title: Text(e),
-              onTap: () => _task.text = e,
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: Text(settings.runOnServer ? '실행 위치: 서버' : '실행 위치: 이 폰'),
+              subtitle: const Text('실행 위치는 모델 탭에서 바꿀 수 있어요'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.read<ShellTabs>().go(AppTab.model),
             ),
+          ),
         ],
       ),
     );
@@ -304,16 +211,11 @@ class _GmailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Column(
         children: [
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF1A73E8),
-              foregroundColor: Colors.white,
-              child: Icon(Icons.mail),
-            ),
+            leading: const CircleAvatar(child: Icon(Icons.mail)),
             title: const Text('Gmail'),
             subtitle: Text(
               google.isSignedIn ? '${google.email} · Gmail API 연결됨' : 'Google 계정 연결이 필요합니다',
@@ -336,7 +238,10 @@ class _GmailCard extends StatelessWidget {
           if (google.error != null && !google.isSignedIn)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(google.error!, style: TextStyle(color: scheme.error, fontSize: 12)),
+              child: Text(
+                google.error!,
+                style: TextStyle(color: AppTokens.of(context).errorInk, fontSize: 12),
+              ),
             ),
           if (google.isSignedIn)
             Builder(
@@ -365,42 +270,3 @@ class _GmailCard extends StatelessWidget {
     );
   }
 }
-
-class _ActiveTaskBanner extends StatelessWidget {
-  const _ActiveTaskBanner({required this.agent, required this.onTap});
-
-  final AgentController agent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
-    return Card(
-      color: needsYou ? scheme.errorContainer : scheme.primaryContainer,
-      child: ListTile(
-        leading: agent.isBusy && !needsYou
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(needsYou ? Icons.notification_important : Icons.task_alt),
-        title: Text(needsYou ? '승인/답변이 필요합니다' : statusLabel(agent.status)),
-        subtitle: const Text('탭해서 진행 상황 보기'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-String statusLabel(AgentStatus s) => switch (s) {
-  AgentStatus.idle => '대기 중',
-  AgentStatus.running => '에이전트가 작업 중입니다',
-  AgentStatus.waitingApproval => '승인을 기다리는 중',
-  AgentStatus.waitingUser => '사용자 입력을 기다리는 중',
-  AgentStatus.finished => '작업 완료',
-  AgentStatus.failed => '작업 실패',
-  AgentStatus.cancelled => '작업 취소됨',
-};

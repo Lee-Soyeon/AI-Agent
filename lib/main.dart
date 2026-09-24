@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'agent/agent_controller.dart';
-import 'agent/chat_session.dart';
 import 'browser/session_store.dart';
 import 'core/settings_store.dart';
 import 'google/google_auth.dart';
 import 'google/writing_style.dart';
 import 'openai/chatgpt_auth.dart';
-import 'ui/home_screen.dart';
+import 'services/service_catalog.dart';
+import 'ui/app_theme.dart';
+import 'ui/main_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,14 +20,8 @@ Future<void> main() async {
   final sessions = SiteSessionStore();
   final google = GoogleAuthService();
   final writingStyle = WritingStyleStore();
-  final history = ChatSessionStore();
-  await Future.wait([
-    settings.load(),
-    sessions.load(),
-    chatgpt.load(),
-    writingStyle.load(),
-    history.load(),
-  ]);
+  final catalog = await ServiceCatalog.load();
+  await Future.wait([settings.load(), sessions.load(), chatgpt.load(), writingStyle.load()]);
   // Google 로그인 복원은 기다리지 않는다 (설정이 없으면 오류만 표시).
   unawaited(google.init());
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -39,7 +34,8 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: google),
         ChangeNotifierProvider.value(value: chatgpt),
         ChangeNotifierProvider.value(value: writingStyle),
-        ChangeNotifierProvider.value(value: history),
+        Provider.value(value: catalog),
+        ChangeNotifierProvider(create: (_) => ShellTabs()),
         ChangeNotifierProvider(
           create: (_) => AgentController(
             settings: settings,
@@ -47,8 +43,8 @@ Future<void> main() async {
             google: google,
             writingStyle: writingStyle,
             navigatorKey: navigatorKey,
-            history: history,
-          )..attachToServer(),
+            catalog: catalog,
+          )..init(),
         ),
       ],
       child: AiAgentApp(navigatorKey: navigatorKey),
@@ -63,14 +59,13 @@ class AiAgentApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF5B5BD6);
     return MaterialApp(
       title: 'AI Agent',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
-      darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
-      home: const HomeScreen(),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
+      home: const MainShell(),
     );
   }
 }

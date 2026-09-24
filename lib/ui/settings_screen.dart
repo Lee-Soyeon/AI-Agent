@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../core/settings_store.dart';
 import '../remote/agent_server_client.dart';
 import 'chatgpt_login.dart';
+import 'app_theme.dart';
+import 'main_shell.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _serverUrl;
   late final TextEditingController _serverToken;
   String? _serverTest;
+  bool _serverOk = false;
   bool _testing = false;
   final Set<LlmVendor> _revealed = {};
 
@@ -64,9 +67,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         baseUrl: _serverUrl.text.trim(),
         token: _serverToken.text.trim(),
       ).ping();
-      _serverTest = '✅ 연결 성공';
+      _serverTest = '연결 성공';
+      _serverOk = true;
     } catch (e) {
-      _serverTest = '❌ $e';
+      _serverTest = '연결 실패: $e';
+      _serverOk = false;
     }
     if (mounted) setState(() => _testing = false);
   }
@@ -86,18 +91,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       maxSteps: (int.tryParse(_maxSteps.text) ?? 60).clamp(5, 200),
       anthropicWorkspaceId: _workspaceId.text,
     );
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저장했어요')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('설정'),
+        title: const Text('모델 설정'),
         actions: [TextButton(onPressed: _save, child: const Text('저장'))],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: tabListPadding(context),
         children: [
           Text('실행 위치', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -126,7 +133,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               decoration: const InputDecoration(
                 labelText: '서버 주소',
                 hintText: 'https://agent.example.com',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
@@ -135,10 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(
-                labelText: '서버 토큰 (AGENT_TOKEN)',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: '서버 토큰 (AGENT_TOKEN)'),
             ),
             const SizedBox(height: 8),
             Row(
@@ -148,7 +151,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Text(_testing ? '확인 중…' : '연결 테스트'),
                 ),
                 const SizedBox(width: 12),
-                if (_serverTest != null) Expanded(child: Text(_serverTest!)),
+                if (_serverTest != null)
+                  Expanded(
+                    child: Text(
+                      _serverTest!,
+                      style: TextStyle(
+                        color: _serverOk
+                            ? AppTokens.of(context).accent
+                            : AppTokens.of(context).errorInk,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],
@@ -184,7 +198,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 enableSuggestions: false,
                 decoration: InputDecoration(
                   labelText: 'API 키',
-                  border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(
@@ -197,11 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextField(
               controller: _models[v],
               autocorrect: false,
-              decoration: InputDecoration(
-                labelText: '모델',
-                helperText: '기본값: ${v.defaultModel}',
-                border: const OutlineInputBorder(),
-              ),
+              decoration: InputDecoration(labelText: '모델', helperText: '기본값: ${v.defaultModel}'),
             ),
             if (v == LlmVendor.anthropic) ...[
               const SizedBox(height: 8),
@@ -211,7 +220,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 decoration: const InputDecoration(
                   labelText: '워크스페이스 ID (선택)',
                   helperText: '"not scoped to a workspace" 오류가 날 때만 입력 (wrkspc_…)',
-                  border: OutlineInputBorder(),
                 ),
               ),
             ],
@@ -223,7 +231,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: const InputDecoration(
               labelText: '작업당 최대 단계 수',
               helperText: '에이전트가 무한히 돌지 않도록 제한합니다',
-              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
