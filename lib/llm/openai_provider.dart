@@ -6,21 +6,52 @@ import 'http_util.dart';
 import 'llm_types.dart';
 
 /// OpenAI Chat Completions API (function calling).
+/// 같은 형식을 쓰는 xAI(Grok)·OpenRouter 도 [baseUrl] 만 바꿔 그대로 쓴다.
 class OpenAiProvider implements LlmProvider {
   OpenAiProvider({
     required this.apiKey,
     required this.model,
     this.baseUrl = 'https://api.openai.com/v1',
+    this.name = 'OpenAI',
+    this.extraHeaders = const {},
     http.Client? client,
   }) : _client = client ?? http.Client();
+
+  factory OpenAiProvider.grok({
+    required String apiKey,
+    required String model,
+    http.Client? client,
+  }) => OpenAiProvider(
+    apiKey: apiKey,
+    model: model,
+    baseUrl: 'https://api.x.ai/v1',
+    name: 'Grok',
+    client: client,
+  );
+
+  factory OpenAiProvider.openRouter({
+    required String apiKey,
+    required String model,
+    http.Client? client,
+  }) => OpenAiProvider(
+    apiKey: apiKey,
+    model: model,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    name: 'OpenRouter',
+    // OpenRouter 대시보드에 앱 이름으로 표시된다 (선택 헤더)
+    extraHeaders: const {'X-Title': 'AI Agent'},
+    client: client,
+  );
 
   final String apiKey;
   final String model;
   final String baseUrl;
+  final String name;
+  final Map<String, String> extraHeaders;
   final http.Client _client;
 
   @override
-  String get displayName => 'OpenAI · $model';
+  String get displayName => '$name · $model';
 
   static Map<String, dynamic> buildBody({
     required String model,
@@ -98,7 +129,7 @@ class OpenAiProvider implements LlmProvider {
     final json = await postJson(
       _client,
       Uri.parse('$baseUrl/chat/completions'),
-      headers: {'authorization': 'Bearer $apiKey'},
+      headers: {'authorization': 'Bearer $apiKey', ...extraHeaders},
       body: buildBody(model: model, system: system, messages: messages, tools: tools),
     );
     return parseResponse(json);

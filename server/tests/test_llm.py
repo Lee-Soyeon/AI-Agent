@@ -1,4 +1,6 @@
-from app.llm import AnthropicProvider, GeminiProvider, Message, OpenAiProvider, ToolCall, ToolSpec
+import httpx
+
+from app.llm import AnthropicProvider, GeminiProvider, Message, OpenAiProvider, ToolCall, ToolSpec, create_provider
 
 TOOLS = [ToolSpec("click", "click", {"type": "object", "properties": {"element_id": {"type": "integer"}}})]
 HISTORY = [
@@ -47,3 +49,23 @@ def test_gemini_function_response_grouping_and_parse():
 def test_anthropic_workspace_header_only_when_set():
     assert "anthropic-workspace-id" not in AnthropicProvider("k", "m").headers()
     assert AnthropicProvider("k", "m", workspace_id="wrkspc_1").headers()["anthropic-workspace-id"] == "wrkspc_1"
+
+
+async def test_grok_and_openrouter_use_openai_format_with_their_urls():
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    keys = dict(anthropic_key="", openai_key="", gemini_key="", xai_key="xk", openrouter_key="ok")
+    for name in ("grok", "openrouter"):
+        p = create_provider(name, "", **keys)
+        p.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        assert (await p.complete("s", [Message("user", "hi")], TOOLS)).text == "ok"
+    assert str(seen[0].url) == "https://api.x.ai/v1/chat/completions"
+    assert seen[0].headers["authorization"] == "Bearer xk"
+    assert b'"model":"grok-4.3"' in seen[0].content.replace(b" ", b"")
+    assert str(seen[1].url) == "https://openrouter.ai/api/v1/chat/completions"
+    assert seen[1].headers["x-title"] == "AI Agent"
+    assert b'"model":"openrouter/free"' in seen[1].content.replace(b" ", b"")

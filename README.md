@@ -1,6 +1,6 @@
 # AI Agent (Flutter)
 
-OpenAI · Claude · Gemini 중 원하는 LLM으로 **웹사이트를 대신 조작하는 AI 에이전트 앱**입니다.
+OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹사이트를 대신 조작하는 AI 에이전트 앱**입니다.
 
 - **로그인만 사용자가 합니다.**
   - 쿠팡: 앱 안 브라우저로 로그인하면 창이 자동으로 닫히고, 이후 에이전트가 화면 없는 웹뷰(헤드리스)로 조작합니다.
@@ -153,6 +153,19 @@ API 키 대신 ChatGPT 구독 사용량으로 에이전트를 돌릴 수 있습�
 3. **전송**: 기존과 같이 승인 카드에서 내용을 확인한 뒤에만 보내집니다.
 
 > 학습할 때 보낸 메일 내용이 선택한 LLM 공급자에게 전송됩니다. 앱은 시작 전에 이 점을 안내하고 동의를 받습니다.
+
+### 모델 고르기
+
+설정의 각 LLM **모델** 칸 옆 목록 버튼을 누르면, 입력한 API 키로 **실제로 쓸 수 있는 모델 목록**을 불러와 고를 수 있습니다
+(모델 이름을 추측할 필요 없음). 404 "모델을 찾을 수 없음" 오류가 나면 여기서 다시 고르세요.
+
+| LLM | 키 발급 | 기본 모델 | 무료 |
+| --- | --- | --- | --- |
+| Gemini | aistudio.google.com | `gemini-3.6-flash` | 무료 한도 있음 (모델마다 다름) |
+| Grok (xAI) | console.x.ai | `grok-4.3` | 유료 (선불 크레딧) |
+| OpenRouter | openrouter.ai/keys | `openrouter/free` (도구 호출 되는 무료 모델로 자동 연결) | 하루 50회, $10 충전 시 1,000회 |
+| Claude | console.anthropic.com | `claude-sonnet-5` | 유료 |
+| OpenAI | platform.openai.com | `gpt-4.1` | 유료 |
 
 ### 사용 순서
 
