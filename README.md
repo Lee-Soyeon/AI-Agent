@@ -146,7 +146,7 @@ API 키 대신 ChatGPT 구독 사용량으로 에이전트를 돌릴 수 있습�
 ### 사용 순서
 
 1. 앱 오른쪽 위 **설정**에서 사용할 LLM을 고르고 API 키를 입력합니다 (또는 ChatGPT 계정으로 로그인).
-   - 기본 모델: OpenAI `gpt-4.1`, Claude `claude-sonnet-5`, Gemini `gemini-2.5-flash` (설정에서 변경 가능)
+   - 기본 모델: OpenAI `gpt-4.1`, Claude `claude-sonnet-5`, Gemini `gemini-3.6-flash` (설정에서 변경 가능)
 2. 홈에서 **쿠팡 로그인**(인앱 브라우저, 로그인되면 자동으로 닫힘)과 **Google 계정 연결**을 합니다.
 3. 할 일을 입력하고 **실행**을 누릅니다. 결제·전송 직전에 승인 카드가 뜹니다.
 

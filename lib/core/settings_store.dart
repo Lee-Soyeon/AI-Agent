@@ -14,7 +14,7 @@ enum LlmVendor {
   openai('OpenAI API', 'gpt-4.1'),
   chatgpt('ChatGPT 구독 (Plus/Pro)', 'gpt-5.5', usesApiKey: false),
   anthropic('Claude (Anthropic)', 'claude-sonnet-5'),
-  gemini('Gemini (Google)', 'gemini-2.5-flash');
+  gemini('Gemini (Google)', 'gemini-3.6-flash');
 
   const LlmVendor(this.label, this.defaultModel, {this.usesApiKey = true});
 
@@ -24,6 +24,9 @@ enum LlmVendor {
   /// false 면 API 키 대신 계정 로그인으로 인증한다.
   final bool usesApiKey;
 }
+
+/// 신규 사용자에게 더 이상 제공되지 않는 예전 기본 모델.
+const _retiredDefaults = {'gemini-2.5-flash'};
 
 /// API 키는 기기 보안 저장소(Keychain / Keystore)에, 나머지 설정은 SharedPreferences 에 저장한다.
 class SettingsStore extends ChangeNotifier {
@@ -62,7 +65,9 @@ class SettingsStore extends ChangeNotifier {
       serverToken = '';
     }
     for (final v in LlmVendor.values) {
-      _models[v] = prefs.getString('model_${v.name}') ?? v.defaultModel;
+      final saved = prefs.getString('model_${v.name}');
+      // 예전 기본값이 저장돼 있고 그 모델이 없어졌다면 새 기본값으로 바꾼다.
+      _models[v] = (saved == null || _retiredDefaults.contains(saved)) ? v.defaultModel : saved;
       try {
         _apiKeys[v] = await _secure.read(key: 'apiKey_${v.name}') ?? '';
       } catch (_) {

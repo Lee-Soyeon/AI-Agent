@@ -270,7 +270,7 @@ class GeminiProvider:
         return self.parse(data)
 
 
-DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-4.1", "gemini": "gemini-2.5-flash"}
+DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-4.1", "gemini": "gemini-3.6-flash"}
 
 
 def create_provider(
