@@ -7,6 +7,7 @@ import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../openai/chatgpt_auth.dart';
+import 'app_theme.dart';
 import 'main_shell.dart';
 import 'task_screen.dart';
 
@@ -16,6 +17,10 @@ const taskExamples = [
   'Gmail 에서 안 읽은 메일 5개 요약해줘',
   'Gmail 에서 가장 최근 메일에 "확인했습니다, 감사합니다" 라고 답장 써서 승인 받고 보내줘',
   '안 읽은 메일 중 답장이 필요한 것에 평소 내 말투로 답장 초안 써줘',
+  '이번 주 토요일 저녁 7시 강남역 근처 4인 파스타집 네이버 예약 가능한 곳 찾아줘',
+  '다음 주 금요일 서울→부산 KTX 오후 6시 이후 좌석 있는지 봐줘',
+  '오늘 CGV 용산 저녁 상영시간표 알려줘',
+  'G마켓·11번가·쿠팡에서 에어팟 프로 최저가 비교해줘',
 ];
 
 /// 홈 탭: 앱 사용법 안내. 각 단계의 준비 상태를 보여주고 해당 탭으로 보내 준다.
@@ -31,6 +36,7 @@ class GuideScreen extends StatelessWidget {
     context.watch<ChatGptAuth>(); // ChatGPT 로그인 상태가 바뀌면 준비 상태를 갱신
     final tabs = context.read<ShellTabs>();
     final theme = Theme.of(context);
+    final t = AppTokens.of(context);
 
     final loggedIn = settings.runOnServer || google.isSignedIn || allSites.any(sessions.isLoggedIn);
 
@@ -40,12 +46,22 @@ class GuideScreen extends StatelessWidget {
         padding: tabListPadding(context),
         children: [
           if (agent.isBusy) ActiveTaskBanner(agent: agent),
-          Text('로그인만 하세요.\n나머지는 에이전트가 합니다.', style: theme.textTheme.headlineSmall),
+          // activity-timeblock page.module.css .title — 24px / 700 / -0.03em
+          Text(
+            '로그인만 하세요.\n나머지는 에이전트가 합니다.',
+            style: TextStyle(
+              color: t.ink,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.72,
+              height: 1.35,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             'OpenAI · Claude · Gemini 중 원하는 모델이 웹사이트와 Gmail 을 대신 조작합니다. '
             '결제와 메일 전송은 반드시 내 승인을 받은 뒤에만 합니다.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: TextStyle(color: t.muted, fontSize: 13.5, height: 1.5),
           ),
           const SizedBox(height: 24),
           Text('시작하기', style: theme.textTheme.titleMedium),
@@ -148,13 +164,16 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.of(context);
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: done == true ? scheme.primary : scheme.surfaceContainerHighest,
-          foregroundColor: done == true ? scheme.onPrimary : scheme.onSurfaceVariant,
-          child: done == true ? const Icon(Icons.check, size: 20) : Text('$step'),
+          radius: 16,
+          backgroundColor: done == true ? t.accent : t.paper,
+          foregroundColor: done == true ? t.accentInk : t.muted,
+          child: done == true
+              ? const Icon(Icons.check_rounded, size: 18)
+              : Text('$step', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         ),
         title: Text(title),
         subtitle: Text(body),
@@ -175,12 +194,13 @@ class _Tip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppTokens.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          Icon(icon, size: 20, color: t.muted),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -188,12 +208,7 @@ class _Tip extends StatelessWidget {
               children: [
                 Text(title, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 2),
-                Text(
-                  body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                Text(body, style: TextStyle(color: t.muted, fontSize: 12.5, height: 1.5)),
               ],
             ),
           ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:ai_agent/agent/agent_controller.dart';
 import 'package:ai_agent/agent/agent_models.dart';
 import 'package:ai_agent/agent/chat_session.dart';
@@ -6,7 +8,10 @@ import 'package:ai_agent/core/settings_store.dart';
 import 'package:ai_agent/google/google_auth.dart';
 import 'package:ai_agent/google/writing_style.dart';
 import 'package:ai_agent/openai/chatgpt_auth.dart';
+import 'package:ai_agent/services/service_catalog.dart';
+import 'package:ai_agent/ui/app_theme.dart';
 import 'package:ai_agent/ui/main_shell.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -50,8 +55,7 @@ void main() {
 
   testWidgets('하단 탭 4개로 홈·채팅·로그인·모델 화면을 오간다', (tester) async {
     SharedPreferences.setMockInitialValues({
-      'chat_sessions':
-          '[{"id":"1","title":"쿠팡 장바구니 확인","status":"finished","lastResult":"3개 담겨 있어요","logs":[]}]',
+      'chat_sessions': '[{"id":"1","title":"쿠팡 장바구니 확인","status":"finished","lastResult":"3개 담겨 있어요","logs":[]}]',
     });
     final chatgpt = ChatGptAuth();
     final settings = SettingsStore(chatgpt: chatgpt);
@@ -76,12 +80,12 @@ void main() {
           ChangeNotifierProvider.value(value: chatgpt),
           ChangeNotifierProvider.value(value: style),
           ChangeNotifierProvider.value(value: agent),
+          Provider.value(
+            value: ServiceCatalog.fromJson(File(ServiceCatalog.assetPath).readAsStringSync()),
+          ),
           ChangeNotifierProvider(create: (_) => ShellTabs()),
         ],
-        child: MaterialApp(
-          theme: ThemeData(colorSchemeSeed: const Color(0xFF5B5BD6)),
-          home: const MainShell(),
-        ),
+        child: MaterialApp(theme: buildAppTheme(Brightness.light), home: const MainShell()),
       ),
     );
     await tester.pumpAndSettle();

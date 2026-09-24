@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
 import '../core/settings_store.dart';
+import 'app_theme.dart';
+import 'browser_pip.dart';
 import 'guide_screen.dart' show taskExamples;
 import 'main_shell.dart';
 
@@ -27,6 +30,7 @@ class _TaskScreenState extends State<TaskScreen> {
   late final _followUp = TextEditingController(text: widget.initialDraft);
   final _scroll = ScrollController();
   int _lastLogCount = 0;
+  bool _userScrolling = false; // 로그를 직접 넘기는 동안 미니 화면을 흐리게
 
   void _send(AgentController agent) {
     final t = _followUp.text.trim();
@@ -113,15 +117,37 @@ class _TaskScreenState extends State<TaskScreen> {
       ),
       body: Column(
         children: [
-          if (agent.lastScreenshot != null) _ScreenshotStrip(agent: agent),
           Expanded(
             child: fresh
                 ? _NewChatHint(onPick: (e) => _followUp.text = e)
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    itemCount: agent.logs.length,
-                    itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
+                : Stack(
+                    children: [
+                      NotificationListener<UserScrollNotification>(
+                        onNotification: (n) {
+                          final scrolling = n.direction != ScrollDirection.idle;
+                          if (scrolling != _userScrolling) {
+                            setState(() => _userScrolling = scrolling);
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          controller: _scroll,
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                          itemCount: agent.logs.length,
+                          itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
+                        ),
+                      ),
+                      if (agent.lastScreenshot != null)
+                        Positioned.fill(
+                          child: BrowserPip(
+                            screenshot: agent.lastScreenshot!,
+                            live: agent.status == AgentStatus.running,
+                            caption: latestAction(agent.logs),
+                            dimmed: _userScrolling,
+                            onOpen: () => Navigator.of(context).push(BrowserViewerPage.route()),
+                          ),
+                        ),
+                    ],
                   ),
           ),
           if (agent.pendingApproval != null)
@@ -167,7 +193,6 @@ class _TaskScreenState extends State<TaskScreen> {
                         maxLines: fresh ? 6 : 4,
                         decoration: InputDecoration(
                           hintText: fresh ? '예) 쿠팡에서 휴지 30롤 담아줘' : '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
-                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
@@ -188,48 +213,6 @@ class _TaskScreenState extends State<TaskScreen> {
   }
 }
 
-class _ScreenshotStrip extends StatelessWidget {
-  const _ScreenshotStrip({required this.agent});
-
-  final AgentController agent;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          insetPadding: const EdgeInsets.all(12),
-          child: InteractiveViewer(child: Image.memory(agent.lastScreenshot!)),
-        ),
-      ),
-      child: Container(
-        height: 160,
-        width: double.infinity,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  agent.lastScreenshot!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                ),
-              ),
-            ),
-            const Expanded(
-              child: Padding(padding: EdgeInsets.all(8), child: Text('백그라운드 브라우저 화면\n(탭해서 크게 보기)')),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _LogTile extends StatelessWidget {
   const _LogTile({required this.entry});
 
@@ -243,9 +226,9 @@ class _LogTile extends StatelessWidget {
       LogKind.thought => (Icons.psychology_alt, scheme.tertiary),
       LogKind.action => (Icons.touch_app, scheme.secondary),
       LogKind.observation => (Icons.visibility, scheme.outline),
-      LogKind.approval => (Icons.verified_user, Colors.orange),
+      LogKind.approval => (Icons.verified_user, AppTokens.of(context).warningInk),
       LogKind.error => (Icons.error_outline, scheme.error),
-      LogKind.result => (Icons.flag, Colors.green),
+      LogKind.result => (Icons.flag, scheme.primary),
     };
 
     final body = entry.kind == LogKind.result || entry.kind == LogKind.user
@@ -323,9 +306,10 @@ class _ApprovalCardState extends State<_ApprovalCard> {
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange, width: 2),
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(AppTokens.r),
+          border: Border.all(color: AppTokens.of(context).warningLine, width: 2),
+          boxShadow: AppTokens.shadowLg,
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -340,7 +324,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                         : r.kind == ApprovalKind.sendEmail
                         ? Icons.outgoing_mail
                         : Icons.warning_amber,
-                    color: Colors.orange,
+                    color: AppTokens.of(context).warningInk,
                   ),
                   const SizedBox(width: 8),
                   Expanded(child: Text(r.title, style: Theme.of(context).textTheme.titleMedium)),
@@ -354,8 +338,8 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(8),
+                    color: scheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(AppTokens.rSm),
                   ),
                   child: SelectableText(r.details!),
                 ),
@@ -366,7 +350,6 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                 decoration: const InputDecoration(
                   hintText: '수정 요청 (선택) — 예: 수량을 2개로 / 더 공손하게',
                   isDense: true,
-                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -443,11 +426,7 @@ class _QuestionCardState extends State<_QuestionCard> {
                   Expanded(
                     child: TextField(
                       controller: _answer,
-                      decoration: const InputDecoration(
-                        hintText: '직접 입력',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: const InputDecoration(hintText: '직접 입력', isDense: true),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -483,7 +462,7 @@ class _NewChatHint extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '할 일을 적으면 에이전트가 백그라운드에서 처리합니다. 결제·메일 전송은 승인 후에만 해요.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: TextStyle(color: AppTokens.of(context).muted, fontSize: 13.5, height: 1.5),
         ),
         const SizedBox(height: 16),
         Text('예시', style: theme.textTheme.labelLarge),
@@ -509,11 +488,13 @@ class ActiveTaskBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.of(context);
     final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
     return Card(
-      color: needsYou ? scheme.errorContainer : scheme.secondaryContainer,
+      color: needsYou ? t.warningBg : t.accentSoft,
       child: ListTile(
+        iconColor: needsYou ? t.warningInk : t.accent,
+        textColor: needsYou ? t.warningInk : t.accent,
         leading: agent.isBusy && !needsYou
             ? const SizedBox(
                 width: 24,

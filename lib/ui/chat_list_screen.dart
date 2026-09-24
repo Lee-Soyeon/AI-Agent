@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
 import '../agent/chat_session.dart';
+import 'app_theme.dart';
 import 'main_shell.dart';
 import 'task_screen.dart';
 
@@ -47,6 +48,7 @@ class ChatListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final agent = context.watch<AgentController>();
     final theme = Theme.of(context);
+    final t = AppTokens.of(context);
     final sessions = agent.chats;
 
     return Scaffold(
@@ -64,11 +66,17 @@ class ChatListScreen extends StatelessWidget {
         padding: tabListPadding(context),
         children: [
           if (agent.isBusy) ActiveTaskBanner(agent: agent),
+          // activity-timeblock .btnGhost — accent-soft 면에 accent 글자
           Card(
-            color: theme.colorScheme.primaryContainer,
+            color: t.accentSoft,
             child: ListTile(
-              leading: const Icon(Icons.add_comment_outlined),
-              title: const Text('새 채팅'),
+              iconColor: t.accent,
+              textColor: t.accent,
+              leading: const Icon(Icons.add_rounded),
+              title: Text(
+                '새 채팅',
+                style: TextStyle(color: t.accent, fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(agent.isBusy ? '진행 중인 작업이 끝나면 시작할 수 있어요' : '무엇을 해드릴까요?'),
               enabled: !agent.isBusy,
               onTap: () => openNewChat(context),
@@ -83,9 +91,7 @@ class ChatListScreen extends StatelessWidget {
               child: Text(
                 '아직 대화가 없어요.\n새 채팅에서 에이전트에게 할 일을 맡겨 보세요.',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                style: TextStyle(color: t.muted, fontSize: 13.5, height: 1.5),
               ),
             ),
           for (final s in sessions)
@@ -97,8 +103,12 @@ class ChatListScreen extends StatelessWidget {
               background: Container(
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 20),
-                color: theme.colorScheme.errorContainer,
-                child: Icon(Icons.delete_outline, color: theme.colorScheme.onErrorContainer),
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: t.errorBg,
+                  borderRadius: BorderRadius.circular(AppTokens.r),
+                ),
+                child: Icon(Icons.delete_outline, color: t.errorInk),
               ),
               child: _SessionTile(
                 session: s,
@@ -130,7 +140,7 @@ class _SessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.of(context);
     final s = session;
     final busy =
         s.status == AgentStatus.running ||
@@ -138,7 +148,7 @@ class _SessionTile extends StatelessWidget {
         s.status == AgentStatus.waitingUser;
 
     final Widget leading = needsYou
-        ? Icon(Icons.notification_important, color: scheme.error)
+        ? Icon(Icons.notification_important_outlined, color: t.warningInk)
         : busy && current
         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
         : Icon(switch (s.status) {
@@ -146,25 +156,24 @@ class _SessionTile extends StatelessWidget {
             AgentStatus.failed => Icons.error_outline,
             AgentStatus.cancelled => Icons.stop_circle_outlined,
             _ => s.remoteTaskId != null ? Icons.cloud_outlined : Icons.chat_bubble_outline,
-          }, color: s.status == AgentStatus.failed ? scheme.error : scheme.onSurfaceVariant);
+          }, color: s.status == AgentStatus.failed ? t.errorInk : t.muted);
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: SizedBox(width: 32, child: Center(child: leading)),
-      title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        [
-          if (busy && current) statusLabel(s.status),
-          if (!(busy && current) && s.preview.isNotEmpty) s.preview.replaceAll('\n', ' '),
-        ].join(),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.only(left: 12, right: 16),
+        leading: SizedBox(width: 32, child: Center(child: leading)),
+        title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          [
+            if (busy && current) statusLabel(s.status),
+            if (!(busy && current) && s.preview.isNotEmpty) s.preview.replaceAll('\n', ' '),
+          ].join(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(_when(s.updatedAt), style: TextStyle(fontSize: 12, color: t.muted)),
+        onTap: onTap,
       ),
-      trailing: Text(
-        _when(s.updatedAt),
-        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-      ),
-      onTap: onTap,
     );
   }
 

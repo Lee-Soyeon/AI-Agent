@@ -13,6 +13,7 @@ import '../google/gmail_api.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../remote/agent_server_client.dart';
+import '../services/service_catalog.dart';
 import '../ui/browser_screen.dart';
 import '../ui/remote_browser_screen.dart';
 import 'agent_models.dart';
@@ -28,6 +29,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     required this.google,
     required this.writingStyle,
     required this.navigatorKey,
+    this.catalog,
   }) {
     WidgetsBinding.instance.addObserver(this);
   }
@@ -36,6 +38,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   final SiteSessionStore sessions;
   final GoogleAuthService google;
   final WritingStyleStore writingStyle;
+  final ServiceCatalog? catalog;
   final GlobalKey<NavigatorState> navigatorKey;
 
   final AgentBrowser _browser = AgentBrowser();
@@ -184,10 +187,12 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       maxSteps: settings.maxSteps,
       gmail: google.isSignedIn ? GmailApi(authHeaders: google.authHeaders) : null,
       gmailAddress: google.email,
+      catalog: catalog,
       systemPrompt: buildSystemPrompt(
         loginState: {for (final s in allSites) s: sessions.isLoggedIn(s)},
         gmailAccount: google.email,
         styleGuide: writingStyle.profile?.guide,
+        serviceIndex: catalog?.promptIndex(),
       ),
     );
     await _run(task);

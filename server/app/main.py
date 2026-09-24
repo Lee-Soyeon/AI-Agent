@@ -15,6 +15,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, W
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from . import catalog
 from .agent import AgentRunner, Task
 from .browser import BrowserManager, Screencast
 from .config import Settings
@@ -97,6 +98,10 @@ def create_app(
     def launch(task: Task, message: str) -> None:
         runner = AgentRunner(state["llm"], state["browser"], max_steps=settings.max_steps)
         task.runner = asyncio.create_task(runner.run(task, message))
+
+    @app.get("/services", dependencies=[Depends(auth)])
+    async def list_services() -> dict[str, Any]:
+        return {"services": catalog.services()}
 
     @app.get("/health")
     async def health() -> dict[str, Any]:

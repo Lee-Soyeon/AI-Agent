@@ -38,6 +38,13 @@ TOOLS = [
              "로그인·2단계 인증·캡차·결제 비밀번호처럼 사용자가 직접 해야 하는 일이 있을 때 호출한다. "
              "사용자의 휴대폰에 이 브라우저 화면이 실시간으로 뜨고, 사용자가 마치면 같은 화면에서 이어서 진행한다.",
              {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}),
+    ToolSpec("service_info",
+             "한국 주요 서비스의 시작·로그인·검색 URL 과 사용 팁을 알려준다. 처음 쓰는 서비스는 먼저 호출하라. "
+             "keyword 를 주면 그 서비스의 검색 결과 URL 도 만들어 준다.",
+             {"type": "object", "properties": {
+                 "service": {"type": "string", "description": "서비스 이름 (예: 쿠팡, 네이버 지도, 코레일)"},
+                 "keyword": {"type": "string", "description": "검색어 (선택)"},
+             }, "required": ["service"]}),
     ToolSpec("finish", "작업을 마치고 한국어로 결과를 보고한다.",
              {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}),
 ]

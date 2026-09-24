@@ -6,9 +6,12 @@ import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
+import '../services/service_catalog.dart';
+import 'app_theme.dart';
 import 'browser_screen.dart';
 import 'main_shell.dart';
 import 'remote_browser_screen.dart';
+import 'services_screen.dart';
 import 'writing_style_screen.dart';
 
 /// 로그인 탭: 에이전트가 대신 쓸 서비스에 로그인하고 관리한다.
@@ -50,7 +53,7 @@ class AccountsScreen extends StatelessWidget {
             settings.runOnServer
                 ? '서버에서 실행 중입니다. 서버 브라우저에서 사용할 서비스에 한 번만 로그인해 두면 서버에 유지됩니다.'
                 : '로그인은 직접 하고, 나머지는 에이전트가 합니다. 비밀번호는 앱이 저장하지 않습니다.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: TextStyle(color: AppTokens.of(context).muted, fontSize: 13.5, height: 1.5),
           ),
           const SizedBox(height: 16),
           Text('연결된 서비스', style: theme.textTheme.titleMedium),
@@ -60,11 +63,7 @@ class AccountsScreen extends StatelessWidget {
             for (final site in allSites)
               Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: site.color,
-                    foregroundColor: Colors.white,
-                    child: Icon(site.icon),
-                  ),
+                  leading: CircleAvatar(child: Icon(site.icon)),
                   title: Text(site.name),
                   subtitle: Text(sessions.isLoggedIn(site) ? '로그인됨' : '로그인이 필요합니다'),
                   trailing: sessions.isLoggedIn(site)
@@ -83,6 +82,19 @@ class AccountsScreen extends StatelessWidget {
                 ),
               ),
           if (!settings.runOnServer) _GmailCard(google: google),
+          Card(
+            child: ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.apps)),
+              title: const Text('한국 주요 서비스'),
+              subtitle: Text(
+                '브라우저로 되는 ${context.read<ServiceCatalog>().supported.length}개 서비스 — 탭해서 로그인',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
+            ),
+          ),
           const SizedBox(height: 16),
           Card(
             child: ListTile(
@@ -199,16 +211,11 @@ class _GmailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Column(
         children: [
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF1A73E8),
-              foregroundColor: Colors.white,
-              child: Icon(Icons.mail),
-            ),
+            leading: const CircleAvatar(child: Icon(Icons.mail)),
             title: const Text('Gmail'),
             subtitle: Text(
               google.isSignedIn ? '${google.email} · Gmail API 연결됨' : 'Google 계정 연결이 필요합니다',
@@ -231,7 +238,10 @@ class _GmailCard extends StatelessWidget {
           if (google.error != null && !google.isSignedIn)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(google.error!, style: TextStyle(color: scheme.error, fontSize: 12)),
+              child: Text(
+                google.error!,
+                style: TextStyle(color: AppTokens.of(context).errorInk, fontSize: 12),
+              ),
             ),
           if (google.isSignedIn)
             Builder(
