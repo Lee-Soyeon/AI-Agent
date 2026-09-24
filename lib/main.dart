@@ -9,6 +9,7 @@ import 'core/settings_store.dart';
 import 'google/google_auth.dart';
 import 'google/writing_style.dart';
 import 'openai/chatgpt_auth.dart';
+import 'services/service_catalog.dart';
 import 'ui/app_theme.dart';
 import 'ui/home_screen.dart';
 
@@ -19,6 +20,7 @@ Future<void> main() async {
   final sessions = SiteSessionStore();
   final google = GoogleAuthService();
   final writingStyle = WritingStyleStore();
+  final catalog = await ServiceCatalog.load();
   await Future.wait([settings.load(), sessions.load(), chatgpt.load(), writingStyle.load()]);
   // Google 로그인 복원은 기다리지 않는다 (설정이 없으면 오류만 표시).
   unawaited(google.init());
@@ -32,6 +34,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: google),
         ChangeNotifierProvider.value(value: chatgpt),
         ChangeNotifierProvider.value(value: writingStyle),
+        Provider.value(value: catalog),
         ChangeNotifierProvider(
           create: (_) => AgentController(
             settings: settings,
@@ -39,6 +42,7 @@ Future<void> main() async {
             google: google,
             writingStyle: writingStyle,
             navigatorKey: navigatorKey,
+            catalog: catalog,
           )..attachToServer(),
         ),
       ],

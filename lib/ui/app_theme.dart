@@ -88,7 +88,12 @@ class AppTokens extends ThemeExtension<AppTokens> {
     BoxShadow(color: Color(0x14191F28), blurRadius: 16, offset: Offset(0, 4)),
   ];
 
-  static AppTokens of(BuildContext context) => Theme.of(context).extension<AppTokens>()!;
+  /// 테마에 토큰이 없으면(테스트의 기본 ThemeData 등) 밝기에 맞는 기본 토큰을 쓴다.
+  static AppTokens of(BuildContext context) {
+    final theme = Theme.of(context);
+    return theme.extension<AppTokens>() ??
+        (theme.brightness == Brightness.dark ? AppTokens.dark : AppTokens.light);
+  }
 
   @override
   AppTokens copyWith() => this;
