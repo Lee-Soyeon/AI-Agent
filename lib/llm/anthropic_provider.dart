@@ -9,12 +9,16 @@ class AnthropicProvider implements LlmProvider {
     required this.apiKey,
     required this.model,
     this.maxTokens = 4096,
+    this.workspaceId,
     http.Client? client,
   }) : _client = client ?? http.Client();
 
   final String apiKey;
   final String model;
   final int maxTokens;
+
+  /// 워크스페이스에 속하지 않은(조직 단위) API 키일 때 필요한 워크스페이스 ID.
+  final String? workspaceId;
   final http.Client _client;
 
   @override
@@ -120,7 +124,11 @@ class AnthropicProvider implements LlmProvider {
     final json = await postJson(
       _client,
       Uri.parse('https://api.anthropic.com/v1/messages'),
-      headers: {'x-api-key': apiKey, 'anthropic-version': '2023-06-01'},
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        if (workspaceId?.isNotEmpty ?? false) 'anthropic-workspace-id': workspaceId!,
+      },
       body: buildBody(
         model: model,
         maxTokens: maxTokens,

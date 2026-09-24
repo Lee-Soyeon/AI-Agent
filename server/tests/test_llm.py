@@ -42,3 +42,8 @@ def test_gemini_function_response_grouping_and_parse():
         {"text": "생각", "thought": True},
         {"functionCall": {"name": "click", "args": {"element_id": 5}}, "thoughtSignature": "sig"}]}}]})
     assert r.text is None and r.tool_calls[0].arguments == {"element_id": 5} and len(r.raw) == 2
+
+
+def test_anthropic_workspace_header_only_when_set():
+    assert "anthropic-workspace-id" not in AnthropicProvider("k", "m").headers()
+    assert AnthropicProvider("k", "m", workspace_id="wrkspc_1").headers()["anthropic-workspace-id"] == "wrkspc_1"

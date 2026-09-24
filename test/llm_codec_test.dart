@@ -4,6 +4,8 @@ import 'package:ai_agent/llm/gemini_provider.dart';
 import 'package:ai_agent/llm/llm_types.dart';
 import 'package:ai_agent/llm/openai_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 const _tools = [
   ToolSpec(
@@ -164,5 +166,26 @@ void main() {
     expect(c.containsKey('tools'), isFalse);
     expect(c.containsKey('parallel_tool_calls'), isFalse);
     expect(c['stream'], isTrue);
+  });
+
+  test('Anthropic: 워크스페이스 ID 가 있으면 anthropic-workspace-id 헤더를 보낸다', () async {
+    final seen = <Map<String, String>>[];
+    final client = MockClient((req) async {
+      seen.add(req.headers);
+      return http.Response('{"content":[{"type":"text","text":"ok"}]}', 200);
+    });
+    await AnthropicProvider(
+      apiKey: 'k',
+      model: 'm',
+      client: client,
+    ).complete(system: 's', messages: [ChatMessage.user('a')], tools: const []);
+    await AnthropicProvider(
+      apiKey: 'k',
+      model: 'm',
+      workspaceId: 'wrkspc_1',
+      client: client,
+    ).complete(system: 's', messages: [ChatMessage.user('a')], tools: const []);
+    expect(seen[0].containsKey('anthropic-workspace-id'), isFalse);
+    expect(seen[1]['anthropic-workspace-id'], 'wrkspc_1');
   });
 }

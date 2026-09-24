@@ -65,6 +65,7 @@ def create_app(
             anthropic_key=settings.anthropic_api_key,
             openai_key=settings.openai_api_key,
             gemini_key=settings.gemini_api_key,
+            anthropic_workspace_id=settings.anthropic_workspace_id,
         )
         yield
         for t in state["tasks"].values():

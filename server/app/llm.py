@@ -140,8 +140,16 @@ class OpenAiProvider:
 
 
 class AnthropicProvider:
-    def __init__(self, api_key: str, model: str, client: httpx.AsyncClient | None = None, max_tokens: int = 4096):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        client: httpx.AsyncClient | None = None,
+        max_tokens: int = 4096,
+        workspace_id: str = "",
+    ):
         self.api_key, self.model, self.max_tokens = api_key, model, max_tokens
+        self.workspace_id = workspace_id
         self.client = client or httpx.AsyncClient()
 
     @staticmethod
@@ -181,11 +189,17 @@ class AnthropicProvider:
         calls = [ToolCall(b["id"], b["name"], _args(b.get("input"))) for b in content if b.get("type") == "tool_use"]
         return LlmResponse(text="\n".join(texts) if texts else None, tool_calls=calls, raw=content)
 
+    def headers(self) -> dict[str, str]:
+        h = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
+        if self.workspace_id:
+            h["anthropic-workspace-id"] = self.workspace_id
+        return h
+
     async def complete(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> LlmResponse:
         data = await _post(
             self.client,
             "https://api.anthropic.com/v1/messages",
-            {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"},
+            self.headers(),
             self.build_body(self.model, self.max_tokens, system, messages, tools),
         )
         return self.parse(data)
@@ -259,10 +273,18 @@ class GeminiProvider:
 DEFAULT_MODELS = {"anthropic": "claude-sonnet-5", "openai": "gpt-4.1", "gemini": "gemini-2.5-flash"}
 
 
-def create_provider(provider: str, model: str, *, anthropic_key: str, openai_key: str, gemini_key: str) -> LlmProvider:
+def create_provider(
+    provider: str,
+    model: str,
+    *,
+    anthropic_key: str,
+    openai_key: str,
+    gemini_key: str,
+    anthropic_workspace_id: str = "",
+) -> LlmProvider:
     model = model or DEFAULT_MODELS.get(provider, "")
     if provider == "anthropic":
-        return AnthropicProvider(anthropic_key, model)
+        return AnthropicProvider(anthropic_key, model, workspace_id=anthropic_workspace_id)
     if provider == "openai":
         return OpenAiProvider(openai_key, model)
     if provider == "gemini":

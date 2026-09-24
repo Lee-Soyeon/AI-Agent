@@ -38,6 +38,9 @@ class SettingsStore extends ChangeNotifier {
   final Map<LlmVendor, String> _models = {};
   int maxSteps = 60;
 
+  /// 선택: 워크스페이스에 속하지 않은 Anthropic 키용 워크스페이스 ID.
+  String anthropicWorkspaceId = '';
+
   /// true 면 작업을 서버(server/)의 브라우저에서 백그라운드로 실행한다.
   bool runOnServer = false;
   String serverUrl = '';
@@ -50,6 +53,7 @@ class SettingsStore extends ChangeNotifier {
       orElse: () => LlmVendor.anthropic,
     );
     maxSteps = prefs.getInt('maxSteps') ?? 60;
+    anthropicWorkspaceId = prefs.getString('anthropicWorkspaceId') ?? '';
     runOnServer = prefs.getBool('runOnServer') ?? false;
     serverUrl = prefs.getString('serverUrl') ?? '';
     try {
@@ -103,10 +107,13 @@ class SettingsStore extends ChangeNotifier {
     required Map<LlmVendor, String> apiKeys,
     required Map<LlmVendor, String> models,
     required int maxSteps,
+    String anthropicWorkspaceId = '',
   }) async {
     final prefs = await SharedPreferences.getInstance();
     this.vendor = vendor;
     this.maxSteps = maxSteps;
+    this.anthropicWorkspaceId = anthropicWorkspaceId.trim();
+    await prefs.setString('anthropicWorkspaceId', this.anthropicWorkspaceId);
     await prefs.setString('vendor', vendor.name);
     await prefs.setInt('maxSteps', maxSteps);
     for (final v in LlmVendor.values) {
@@ -126,7 +133,11 @@ class SettingsStore extends ChangeNotifier {
     return switch (vendor) {
       LlmVendor.openai => OpenAiProvider(apiKey: key, model: m),
       LlmVendor.chatgpt => ChatGptCodexProvider(auth: chatgpt, model: m),
-      LlmVendor.anthropic => AnthropicProvider(apiKey: key, model: m),
+      LlmVendor.anthropic => AnthropicProvider(
+        apiKey: key,
+        model: m,
+        workspaceId: anthropicWorkspaceId,
+      ),
       LlmVendor.gemini => GeminiProvider(apiKey: key, model: m),
     };
   }

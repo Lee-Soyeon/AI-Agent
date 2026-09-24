@@ -17,6 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final Map<LlmVendor, TextEditingController> _keys;
   late final Map<LlmVendor, TextEditingController> _models;
   late final TextEditingController _maxSteps;
+  late final TextEditingController _workspaceId;
   late bool _runOnServer;
   late final TextEditingController _serverUrl;
   late final TextEditingController _serverToken;
@@ -32,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _keys = {for (final v in LlmVendor.values) v: TextEditingController(text: s.apiKey(v))};
     _models = {for (final v in LlmVendor.values) v: TextEditingController(text: s.model(v))};
     _maxSteps = TextEditingController(text: '${s.maxSteps}');
+    _workspaceId = TextEditingController(text: s.anthropicWorkspaceId);
     _runOnServer = s.runOnServer;
     _serverUrl = TextEditingController(text: s.serverUrl);
     _serverToken = TextEditingController(text: s.serverToken);
@@ -39,7 +41,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    for (final c in [..._keys.values, ..._models.values, _maxSteps, _serverUrl, _serverToken]) {
+    for (final c in [
+      ..._keys.values,
+      ..._models.values,
+      _maxSteps,
+      _serverUrl,
+      _serverToken,
+      _workspaceId,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -75,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       apiKeys: {for (final e in _keys.entries) e.key: e.value.text},
       models: {for (final e in _models.entries) e.key: e.value.text},
       maxSteps: (int.tryParse(_maxSteps.text) ?? 60).clamp(5, 200),
+      anthropicWorkspaceId: _workspaceId.text,
     );
     if (mounted) Navigator.of(context).pop();
   }
@@ -193,6 +203,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 border: const OutlineInputBorder(),
               ),
             ),
+            if (v == LlmVendor.anthropic) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: _workspaceId,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: '워크스페이스 ID (선택)',
+                  helperText: '"not scoped to a workspace" 오류가 날 때만 입력 (wrkspc_…)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
           ],
           TextField(
