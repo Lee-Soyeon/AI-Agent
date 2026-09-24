@@ -83,6 +83,7 @@ lib/
     ├── home_screen.dart          # 로그인 상태, 작업 입력, 예시
     ├── remote_browser_screen.dart # 서버 브라우저 실시간 화면 (로그인·사용자 도움)
     ├── task_screen.dart          # 실시간 로그, 브라우저 스크린샷, 승인/질문 카드, 후속 지시
+    ├── browser_pip.dart          # 작업 화면 위에 떠 있는 브라우저 미니 화면(PiP)·전체 화면 보기
     ├── browser_screen.dart       # 사용자가 직접 조작하는 브라우저
     └── settings_screen.dart      # LLM 선택, API 키, 모델
 ```

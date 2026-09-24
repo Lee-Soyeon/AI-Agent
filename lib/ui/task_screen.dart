@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
 import 'app_theme.dart';
+import 'browser_pip.dart';
 import 'home_screen.dart' show statusLabel;
 
 class TaskScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class _TaskScreenState extends State<TaskScreen> {
   final _followUp = TextEditingController();
   final _scroll = ScrollController();
   int _lastLogCount = 0;
+  bool _userScrolling = false; // 로그를 직접 넘기는 동안 미니 화면을 흐리게
 
   @override
   void dispose() {
@@ -64,13 +67,33 @@ class _TaskScreenState extends State<TaskScreen> {
       ),
       body: Column(
         children: [
-          if (agent.lastScreenshot != null) _ScreenshotStrip(agent: agent),
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              itemCount: agent.logs.length,
-              itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
+            child: Stack(
+              children: [
+                NotificationListener<UserScrollNotification>(
+                  onNotification: (n) {
+                    final scrolling = n.direction != ScrollDirection.idle;
+                    if (scrolling != _userScrolling) setState(() => _userScrolling = scrolling);
+                    return false;
+                  },
+                  child: ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    itemCount: agent.logs.length,
+                    itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
+                  ),
+                ),
+                if (agent.lastScreenshot != null)
+                  Positioned.fill(
+                    child: BrowserPip(
+                      screenshot: agent.lastScreenshot!,
+                      live: agent.status == AgentStatus.running,
+                      caption: latestAction(agent.logs),
+                      dimmed: _userScrolling,
+                      onOpen: () => Navigator.of(context).push(BrowserViewerPage.route()),
+                    ),
+                  ),
+              ],
             ),
           ),
           if (agent.pendingApproval != null)
@@ -110,48 +133,6 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _ScreenshotStrip extends StatelessWidget {
-  const _ScreenshotStrip({required this.agent});
-
-  final AgentController agent;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          insetPadding: const EdgeInsets.all(12),
-          child: InteractiveViewer(child: Image.memory(agent.lastScreenshot!)),
-        ),
-      ),
-      child: Container(
-        height: 160,
-        width: double.infinity,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(
-                  agent.lastScreenshot!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                ),
-              ),
-            ),
-            const Expanded(
-              child: Padding(padding: EdgeInsets.all(8), child: Text('백그라운드 브라우저 화면\n(탭해서 크게 보기)')),
-            ),
-          ],
-        ),
       ),
     );
   }
