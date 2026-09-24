@@ -84,7 +84,25 @@ class DomScripts {
   const form = el.form || el.closest('form');
   const submitLabel = form ? Array.from(form.querySelectorAll('button,[type=submit]'))
       .map(b => (b.getAttribute('aria-label') || b.innerText || b.value || '')).join(' ').replace(/\\s+/g,' ').slice(0,200) : '';
-  return JSON.stringify({ok:true, label:t, tag:el.tagName.toLowerCase(), type:(el.type||''), formSubmitLabels: submitLabel});
+  const attrs = [el.getAttribute('autocomplete'), el.name, el.id, el.getAttribute('placeholder'),
+    el.getAttribute('aria-label'), el.labels && el.labels[0] ? el.labels[0].innerText : ''].filter(Boolean).join(' ');
+  const paymentField = /^cc-/i.test(el.getAttribute('autocomplete') || '') ||
+    /(card.?(num|no)|카드\\s*번호|cvc|cvv|보안\\s*코드|유효\\s*기간|expir|카드\\s*비밀번호|결제\\s*비밀번호)/i.test(attrs);
+  return JSON.stringify({ok:true, label:t, tag:el.tagName.toLowerCase(), type:(el.type||''),
+    formSubmitLabels: submitLabel, paymentField});
+})()
+''';
+
+  /// 주문·결제·예약 완료 페이지인지 (결제 넘겨받은 화면을 자동으로 닫을 때 사용).
+  static const paymentDone = r'''
+(function(){
+  const kw = /(주문이?\s*완료|결제가?\s*완료|주문\s*완료|구매\s*완료|예매\s*완료|예약\s*완료|예약이\s*확정|order\s*(is\s*)?(complete|confirmed|placed)|thank you for your order)/i;
+  const heads = Array.from(document.querySelectorAll('h1,h2,h3,[class*=complete],[class*=Complete],[class*=success],[class*=Success]'))
+    .map(e => e.innerText || '').join(' ').slice(0, 2000);
+  const url = location.href;
+  const urlHint = /(complete|success|done|finish|result)/i.test(url) && /(order|pay|checkout|reserv|book|ticket)/i.test(url);
+  const body = document.body ? document.body.innerText.slice(0, 3000) : '';
+  return JSON.stringify({done: kw.test(document.title || '') || kw.test(heads) || (urlHint && kw.test(body)), url});
 })()
 ''';
 

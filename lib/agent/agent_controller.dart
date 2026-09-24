@@ -15,6 +15,7 @@ import '../google/writing_style.dart';
 import '../remote/agent_server_client.dart';
 import '../services/service_catalog.dart';
 import '../ui/browser_screen.dart';
+import '../ui/payment_screen.dart';
 import '../ui/remote_browser_screen.dart';
 import 'agent_models.dart';
 import 'agent_runner.dart';
@@ -82,6 +83,8 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   Timer? _poll;
   bool _polling = false;
   bool _helpOpen = false;
+  bool _paymentOpen = false;
+  final ValueNotifier<bool> _paymentClosed = ValueNotifier(false);
   String? _lastPollError;
 
   bool get isRemote => _remoteTaskId != null;
@@ -250,6 +253,16 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   }
 
   void resolveApproval(bool approved, {String? feedback}) {
+    if (isRemote && (pendingApproval?.handoff ?? false)) {
+      pendingApproval = null;
+      notifyListeners();
+      if (approved) {
+        _openRemotePayment();
+      } else {
+        _remoteCall(() => _server!.payment(_remoteTaskId!, approved: false, feedback: feedback));
+      }
+      return;
+    }
     if (isRemote) {
       pendingApproval = null;
       notifyListeners();
@@ -297,6 +310,27 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   void onScreenshot(List<int> jpeg) {
     lastScreenshot = Uint8List.fromList(jpeg);
     notifyListeners();
+  }
+
+  @override
+  Future<PaymentOutcome> requestPaymentHandoff(ApprovalRequest request) async {
+    final decision = await requestApproval(request);
+    if (!decision.approved) return PaymentOutcome(approved: false, feedback: decision.feedback);
+    final nav = navigatorKey.currentState;
+    final url = await _browser.currentUrl();
+    if (nav == null) return PaymentOutcome(approved: true, url: url);
+    helpReason = request.title;
+    notifyListeners();
+    // 에이전트의 브라우저를 그대로 화면에 붙인다 → 주문서·결제수단 선택이 유지된다.
+    final headless = _browser.takeOverForDisplay();
+    final out = await nav.push<PaymentOutcome>(
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(request: request, headless: headless, fallbackUrl: url),
+      ),
+    );
+    helpReason = null;
+    notifyListeners();
+    return out ?? PaymentOutcome(approved: true, url: url);
   }
 
   @override
@@ -466,19 +500,22 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   void _applyPending(Map<String, dynamic>? p) {
     final type = p?['type'];
-    if (type == 'approval') {
+    if (type == 'approval' || (type == 'payment' && !_paymentOpen)) {
       final title = '${p!['title'] ?? '승인 요청'}';
       if (pendingApproval?.title != title || pendingApproval?.summary != p['summary']) {
         pendingApproval = ApprovalRequest(
-          kind: ApprovalKind.parse(p['kind']),
+          kind: type == 'payment' ? ApprovalKind.purchase : ApprovalKind.parse(p['kind']),
           title: title,
           summary: '${p['summary'] ?? ''}',
           details: p['details'] as String?,
+          handoff: type == 'payment',
         );
       }
     } else {
       pendingApproval = null;
     }
+    // 서버가 결제 완료 페이지를 감지해 스스로 넘어갔다면 열려 있는 결제 화면을 닫는다.
+    if (type != 'payment' && _paymentOpen) _paymentClosed.value = true;
     if (type == 'question') {
       final q = '${p!['question'] ?? ''}';
       if (pendingQuestion?.question != q) {
@@ -510,6 +547,30 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     helpReason = null;
     _helpOpen = false;
     await _remoteCall(() => client.helpDone(id));
+  }
+
+  /// 서버 모드 결제: 서버 브라우저의 결제 직전 화면을 실시간으로 띄워 사용자가 직접 결제한다.
+  Future<void> _openRemotePayment() async {
+    final nav = navigatorKey.currentState;
+    final client = _server;
+    final id = _remoteTaskId;
+    if (nav == null || client == null || id == null) return;
+    _paymentOpen = true;
+    _paymentClosed.value = false;
+    final completed = await nav.push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RemoteBrowserScreen(
+          client: client,
+          title: '결제',
+          message: '결제하기를 누르고 결제 비밀번호·카드 인증을 마치세요. 완료되면 자동으로 닫힙니다.',
+          paymentMode: true,
+          closeSignal: _paymentClosed,
+        ),
+      ),
+    );
+    _paymentOpen = false;
+    if (_paymentClosed.value) return; // 서버가 완료를 감지해 이미 넘어감
+    await _remoteCall(() => client.payment(id, approved: true, completed: completed ?? false));
   }
 
   Future<void> _remoteCall(Future<void> Function() fn) async {

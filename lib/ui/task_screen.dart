@@ -333,6 +333,14 @@ class _ApprovalCardState extends State<_ApprovalCard> {
               ),
               const SizedBox(height: 8),
               SelectableText(r.summary),
+              if (r.handoff) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '에이전트가 결제 직전까지 준비했습니다. "결제하러 가기"를 누르면 그 화면이 그대로 열리고, '
+                  '결제하기·결제 비밀번호·카드 인증은 직접 하시면 됩니다. 완료되면 자동으로 돌아옵니다.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               if (r.details != null && r.details!.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
@@ -366,7 +374,7 @@ class _ApprovalCardState extends State<_ApprovalCard> {
                   Expanded(
                     child: FilledButton(
                       onPressed: () => widget.agent.resolveApproval(true),
-                      child: const Text('승인'),
+                      child: Text(r.handoff ? '결제하러 가기' : '승인'),
                     ),
                   ),
                 ],

@@ -99,3 +99,44 @@ def test_compact_history_keeps_last_two_snapshots():
     assert "생략됨 — https://a/0" in msgs[0].text
     assert "생략됨" in msgs[1].text
     assert "긴 본문" in msgs[2].text and "긴 본문" in msgs[3].text
+
+
+HANDOFF = call("handoff_payment", {"title": "쿠팡 결제: 콜라", "summary": "제로 콜라 24캔 19,800원 · 쿠페이"}, "h")
+
+
+async def test_payment_handoff_completes_automatically_when_done_page_appears(monkeypatch):
+    llm = ScriptedLlm([HANDOFF, LlmResponse(text="주문 완료")])
+    browser = FakeBrowser()
+    browser.done_after = 2
+    runner = AgentRunner(llm, browser)
+    orig = runner._watch_payment
+    monkeypatch.setattr(runner, "_watch_payment", lambda task: orig(task, interval=0.01))
+    task = Task("콜라 사줘")
+    job = asyncio.create_task(runner.run(task, task.prompt))
+    while task.pending is None:
+        await asyncio.sleep(0.005)
+    assert task.pending.type == "payment" and task.status == "waiting_approval"
+    assert "19,800원" in task.to_json()["pending"]["summary"]
+    await job  # 사용자가 아무것도 안 눌러도 완료 페이지가 감지되면 넘어간다
+    assert task.result == "주문 완료"
+    assert "결제를 마쳤습니다" in last_tool_result(llm.seen[1])
+    assert browser.clicked == []  # 결제 버튼은 에이전트가 누르지 않는다
+    assert any("자동 감지" in e.text for e in task.logs)
+
+
+async def test_payment_handoff_manual_results():
+    for decision, expected in [
+        ({"approved": False, "feedback": "12캔으로"}, "12캔으로"),
+        ({"approved": True, "completed": False}, "결제를 마치지 않고"),
+        ({"approved": True, "completed": True}, "결제를 마쳤습니다"),
+    ]:
+        llm = ScriptedLlm([HANDOFF, LlmResponse(text="끝")])
+        task = Task("x")
+        await run_with_decisions(AgentRunner(llm, FakeBrowser()), task, "x", [decision])
+        assert expected in last_tool_result(llm.seen[1]), decision
+
+
+async def test_payment_fields_are_refused():
+    llm = ScriptedLlm([call("type_text", {"element_id": 4, "text": "1234"}), LlmResponse(text="끝")])
+    await AgentRunner(llm, FakeBrowser()).run(Task("x"), "x")
+    assert "handoff_payment" in last_tool_result(llm.seen[1])

@@ -56,7 +56,7 @@
    "home": "https://m.coupang.com/",
    "login": "https://login.coupang.com/login/login.pang",
    "search": "https://m.coupang.com/nm/search?q={q}",
-   "hint": "장바구니: https://cart.coupang.com/cartView.pang . 가격·단위가격·로켓배송·리뷰를 비교. 결제 비밀번호(쿠페이)는 사용자에게 넘김"
+   "hint": "장바구니: https://cart.coupang.com/cartView.pang . 가격·단위가격·로켓배송·리뷰를 비교. 주문서의 결제수단은 쿠페이(등록 카드·계좌)를 고르고 '신용/체크카드'(카드번호 새로 입력)는 고르지 말 것. 주문서가 준비되면 결제하기를 누르지 말고 handoff_payment 로 사용자에게 넘김"
   },
   {
    "id": "instagram",
