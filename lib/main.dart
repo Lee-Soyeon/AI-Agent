@@ -9,7 +9,7 @@ import 'core/settings_store.dart';
 import 'google/google_auth.dart';
 import 'google/writing_style.dart';
 import 'openai/chatgpt_auth.dart';
-import 'ui/home_screen.dart';
+import 'ui/main_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +31,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: google),
         ChangeNotifierProvider.value(value: chatgpt),
         ChangeNotifierProvider.value(value: writingStyle),
+        ChangeNotifierProvider(create: (_) => ShellTabs()),
         ChangeNotifierProvider(
           create: (_) => AgentController(
             settings: settings,
@@ -38,7 +39,7 @@ Future<void> main() async {
             google: google,
             writingStyle: writingStyle,
             navigatorKey: navigatorKey,
-          )..attachToServer(),
+          )..init(),
         ),
       ],
       child: AiAgentApp(navigatorKey: navigatorKey),
@@ -60,7 +61,7 @@ class AiAgentApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
-      home: const HomeScreen(),
+      home: const MainShell(),
     );
   }
 }

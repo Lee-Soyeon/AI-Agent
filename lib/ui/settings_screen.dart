@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/settings_store.dart';
 import '../remote/agent_server_client.dart';
 import 'chatgpt_login.dart';
+import 'main_shell.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -86,18 +87,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       maxSteps: (int.tryParse(_maxSteps.text) ?? 60).clamp(5, 200),
       anthropicWorkspaceId: _workspaceId.text,
     );
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저장했어요')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('설정'),
+        title: const Text('모델 설정'),
         actions: [TextButton(onPressed: _save, child: const Text('저장'))],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: tabListPadding(context),
         children: [
           Text('실행 위치', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),

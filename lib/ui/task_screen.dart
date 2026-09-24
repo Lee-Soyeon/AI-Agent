@@ -3,19 +3,60 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../agent/agent_models.dart';
-import 'home_screen.dart' show statusLabel;
+import '../core/settings_store.dart';
+import 'guide_screen.dart' show taskExamples;
+import 'main_shell.dart';
 
+/// 새 채팅을 열고 작업 화면으로 간다. [draft] 가 있으면 입력창에 미리 채운다.
+void openNewChat(BuildContext context, {String? draft}) {
+  context.read<AgentController>().newSession();
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => TaskScreen(initialDraft: draft)));
+}
+
+/// 한 채팅(대화)의 작업 화면. 새 채팅이면 할 일을 입력받고, 진행 중이면 로그·승인 카드를 보여준다.
 class TaskScreen extends StatefulWidget {
-  const TaskScreen({super.key});
+  const TaskScreen({super.key, this.initialDraft});
+
+  final String? initialDraft;
 
   @override
   State<TaskScreen> createState() => _TaskScreenState();
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  final _followUp = TextEditingController();
+  late final _followUp = TextEditingController(text: widget.initialDraft);
   final _scroll = ScrollController();
   int _lastLogCount = 0;
+
+  void _send(AgentController agent) {
+    final t = _followUp.text.trim();
+    if (t.isEmpty) return;
+    if (agent.current.isEmpty) {
+      final settings = context.read<SettingsStore>();
+      if (!settings.isConfigured) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              settings.runOnServer ? '먼저 모델 탭에서 서버 주소와 토큰을 입력하세요.' : '먼저 모델 탭에서 LLM API 키를 입력하세요.',
+            ),
+            action: SnackBarAction(
+              label: '모델 설정',
+              onPressed: () {
+                context.read<ShellTabs>().go(AppTab.model);
+                Navigator.of(context).popUntil((r) => r.isFirst);
+              },
+            ),
+          ),
+        );
+        return;
+      }
+      agent.startTask(t);
+    } else {
+      agent.followUp(t);
+    }
+    _followUp.clear();
+    FocusScope.of(context).unfocus();
+  }
 
   @override
   void dispose() {
@@ -42,10 +83,19 @@ class _TaskScreenState extends State<TaskScreen> {
   Widget build(BuildContext context) {
     final agent = context.watch<AgentController>();
     _autoScroll(agent.logs.length);
+    final session = agent.current;
+    final fresh = session.isEmpty && !agent.isBusy;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(statusLabel(agent.status)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(fresh ? '새 채팅' : session.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (!fresh)
+              Text(statusLabel(agent.status), style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
         actions: [
           if (agent.isBusy)
             TextButton.icon(
@@ -65,18 +115,44 @@ class _TaskScreenState extends State<TaskScreen> {
         children: [
           if (agent.lastScreenshot != null) _ScreenshotStrip(agent: agent),
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              itemCount: agent.logs.length,
-              itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
-            ),
+            child: fresh
+                ? _NewChatHint(onPick: (e) => _followUp.text = e)
+                : ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    itemCount: agent.logs.length,
+                    itemBuilder: (_, i) => _LogTile(entry: agent.logs[i]),
+                  ),
           ),
           if (agent.pendingApproval != null)
             _ApprovalCard(agent: agent, request: agent.pendingApproval!),
           if (agent.pendingQuestion != null)
             _QuestionCard(agent: agent, question: agent.pendingQuestion!),
-          if (!agent.isBusy && agent.hasConversation)
+          if (!agent.isBusy && !fresh && !agent.hasConversation)
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '앱을 다시 시작해서 이 대화는 이어서 지시할 수 없어요.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        agent.newSession();
+                        setState(() {});
+                      },
+                      child: const Text('새 채팅'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (!agent.isBusy && (fresh || agent.hasConversation))
             SafeArea(
               top: false,
               child: Padding(
@@ -86,24 +162,21 @@ class _TaskScreenState extends State<TaskScreen> {
                     Expanded(
                       child: TextField(
                         controller: _followUp,
+                        autofocus: fresh && widget.initialDraft == null,
                         minLines: 1,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          hintText: '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
-                          border: OutlineInputBorder(),
+                        maxLines: fresh ? 6 : 4,
+                        decoration: InputDecoration(
+                          hintText: fresh ? '예) 쿠팡에서 휴지 30롤 담아줘' : '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton.filled(
-                      icon: const Icon(Icons.send),
-                      onPressed: () {
-                        final t = _followUp.text.trim();
-                        if (t.isEmpty) return;
-                        _followUp.clear();
-                        agent.followUp(t);
-                      },
+                      icon: Icon(fresh ? Icons.play_arrow : Icons.send),
+                      tooltip: fresh ? '실행' : '보내기',
+                      onPressed: () => _send(agent),
                     ),
                   ],
                 ),
@@ -394,3 +467,76 @@ class _QuestionCardState extends State<_QuestionCard> {
     );
   }
 }
+
+class _NewChatHint extends StatelessWidget {
+  const _NewChatHint({required this.onPick});
+
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('무엇을 해드릴까요?', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 4),
+        Text(
+          '할 일을 적으면 에이전트가 백그라운드에서 처리합니다. 결제·메일 전송은 승인 후에만 해요.',
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 16),
+        Text('예시', style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        for (final e in taskExamples)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.lightbulb_outline, size: 20),
+            title: Text(e),
+            onTap: () => onPick(e),
+          ),
+      ],
+    );
+  }
+}
+
+/// 진행 중인 작업 배너. 탭하면 작업 화면을 연다.
+class ActiveTaskBanner extends StatelessWidget {
+  const ActiveTaskBanner({super.key, required this.agent});
+
+  final AgentController agent;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
+    return Card(
+      color: needsYou ? scheme.errorContainer : scheme.secondaryContainer,
+      child: ListTile(
+        leading: agent.isBusy && !needsYou
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(needsYou ? Icons.notification_important : Icons.task_alt),
+        title: Text(needsYou ? '승인/답변이 필요합니다' : statusLabel(agent.status)),
+        subtitle: Text(agent.current.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () =>
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen())),
+      ),
+    );
+  }
+}
+
+String statusLabel(AgentStatus s) => switch (s) {
+  AgentStatus.idle => '대기 중',
+  AgentStatus.running => '에이전트가 작업 중입니다',
+  AgentStatus.waitingApproval => '승인을 기다리는 중',
+  AgentStatus.waitingUser => '사용자 입력을 기다리는 중',
+  AgentStatus.finished => '작업 완료',
+  AgentStatus.failed => '작업 실패',
+  AgentStatus.cancelled => '작업 취소됨',
+};

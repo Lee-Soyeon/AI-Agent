@@ -5,7 +5,8 @@ enum AgentStatus { idle, running, waitingApproval, waitingUser, finished, failed
 enum LogKind { user, thought, action, observation, approval, error, result }
 
 class AgentLogEntry {
-  AgentLogEntry(this.kind, this.text, {this.detail}) : time = DateTime.now();
+  AgentLogEntry(this.kind, this.text, {this.detail, DateTime? time})
+    : time = time ?? DateTime.now();
 
   final LogKind kind;
   final String text;
