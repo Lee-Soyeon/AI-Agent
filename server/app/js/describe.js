@@ -7,7 +7,8 @@
   const form = el.form || el.closest('form');
   const formSubmitLabels = form
     ? Array.from(form.querySelectorAll('button,[type=submit]'))
-        .map(b => b.getAttribute('aria-label') || b.innerText || b.value || '').join(' ').replace(/\s+/g, ' ').slice(0, 200)
+        .map(b => (b.getAttribute('aria-label') || b.innerText || b.value || '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean).join('\n').slice(0, 200) // 버튼마다 한 줄 ("^등록$" 같은 규칙이 버튼 단위로 걸리도록)
     : '';
   const attrs = [el.getAttribute('autocomplete'), el.name, el.id, el.getAttribute('placeholder'),
     el.getAttribute('aria-label'), el.labels && el.labels[0] ? el.labels[0].innerText : ''].filter(Boolean).join(' ');

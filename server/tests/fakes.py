@@ -32,12 +32,13 @@ class FakeBrowser:
         self.clicked: list[int] = []
         self.visited: list[str] = []
         self.inputs: list[dict[str, Any]] = []
+        self.url = "https://m.coupang.com/"
 
     async def navigate(self, url: str) -> None:
         self.visited.append(url)
 
     async def current_url(self) -> str:
-        return "https://m.coupang.com/"
+        return self.url
 
     async def snapshot(self) -> PageSnapshot:
         return PageSnapshot({

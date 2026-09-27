@@ -172,12 +172,10 @@ class AgentRunner {
           if (d['ok'] != true) return _error('id $id 요소를 찾을 수 없습니다. read_page 로 최신 id 를 확인하세요.');
           final label = '${d['label'] ?? ''}';
           if (safety.isSensitive(label)) {
-            if (!safety.consumeGrant()) {
-              hooks.onLog(AgentLogEntry(LogKind.approval, '승인 없이 "$label" 클릭 시도 → 차단'));
-              return _error(
-                '차단됨: "$label" 은(는) 결제/전송 등 되돌릴 수 없는 동작입니다. '
-                '먼저 request_approval 로 전체 내용을 보여주고 사용자 승인을 받으세요.',
-              );
+            final blocked = safety.authorize(label, url: await browser.currentUrl());
+            if (blocked != null) {
+              hooks.onLog(AgentLogEntry(LogKind.approval, '"$label" 클릭 차단: $blocked'));
+              return _error('차단됨: "$label" 은(는) 되돌릴 수 없는 동작입니다. $blocked');
             }
             hooks.onLog(AgentLogEntry(LogKind.approval, '승인된 동작 실행: "$label"'));
           }
@@ -201,10 +199,15 @@ class AgentRunner {
           if (d['type'] == 'password') {
             return _error('비밀번호 입력창에는 입력할 수 없습니다. request_user_help 로 사용자에게 로그인을 요청하세요.');
           }
-          if (submit &&
-              safety.isSensitive('${d['formSubmitLabels'] ?? ''}') &&
-              !safety.consumeGrant()) {
-            return _error('차단됨: 이 입력창에서 Enter 를 누르면 전송/결제될 수 있습니다. submit 없이 입력하거나 먼저 승인을 받으세요.');
+          final submitLabels = '${d['formSubmitLabels'] ?? ''}';
+          if (submit && safety.isSensitive(submitLabels)) {
+            final blocked = safety.authorize(submitLabels, url: await browser.currentUrl());
+            if (blocked != null) {
+              return _error(
+                '차단됨: 이 입력창에서 Enter 를 누르면 전송/결제/게시될 수 있습니다. '
+                'submit 없이 입력하거나 먼저 승인을 받으세요. $blocked',
+              );
+            }
           }
           final r = await browser.typeText(id, text, submit: submit);
           if (r['ok'] != true) {
@@ -235,11 +238,16 @@ class AgentRunner {
           final decision = await hooks.requestApproval(req);
           hooks.onStatus(AgentStatus.running);
           if (decision.approved) {
-            safety.grant(req.kind.name, req.summary);
+            safety.grant(
+              req.kind,
+              content: [req.title, req.summary, req.details ?? ''].join('\n'),
+              url: await browser.currentUrl(),
+            );
             hooks.onLog(AgentLogEntry(LogKind.approval, '✅ 사용자가 승인했습니다: ${req.title}'));
-            return const _Outcome(
-              '승인됨. 이제 해당 버튼(결제하기/보내기 등)을 10분 안에 한 번 누를 수 있습니다. '
-              '승인받은 내용과 다르게 진행하지 마세요.',
+            final can = SafetyPolicy.allowed[req.kind]!.map((a) => a.label).join('·');
+            return _Outcome(
+              '승인됨. 이 사이트에서 $can 버튼을 10분 안에 한 번 누를 수 있습니다. '
+              '승인받은 내용과 다르게 진행하지 마세요. 버튼의 금액이 승인 내용과 다르면 시스템이 막습니다.',
             );
           }
           safety.revoke();

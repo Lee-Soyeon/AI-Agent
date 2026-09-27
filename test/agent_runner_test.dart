@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ai_agent/agent/agent_models.dart';
 import 'package:ai_agent/agent/agent_runner.dart';
+import 'package:ai_agent/agent/agent_tools.dart';
 import 'package:ai_agent/agent/safety.dart';
 import 'package:ai_agent/browser/agent_browser.dart';
 import 'package:ai_agent/google/gmail_api.dart';
@@ -115,16 +117,64 @@ String _lastToolResult(List<ChatMessage> msgs) =>
     msgs.lastWhere((m) => m.role == ChatRole.tool).text!;
 
 void main() {
-  test('safety pattern: 결제/전송만 민감, 장바구니/구매하기는 아님', () {
+  test('민감 버튼 분류가 서버와 같은 표(sensitive_labels.json)를 따른다', () {
+    final table = jsonDecode(File('server/tests/sensitive_labels.json').readAsStringSync()) as Map;
+    final wrong = [
+      for (final row in table['labels'] as List)
+        if (SensitiveAction.classify(row[0] as String)?.name != row[1])
+          '${row[0]}: 기대 ${row[1]}, 실제 ${SensitiveAction.classify(row[0] as String)?.name}',
+    ];
+    expect(wrong, isEmpty);
+    expect(table['approval_kinds'], [for (final k in ApprovalKind.values) k.wire]);
+  });
+
+  test('승인은 종류·사이트·금액에 묶인다', () {
     final p = SafetyPolicy();
-    expect(p.isSensitive('결제하기'), isTrue);
-    expect(p.isSensitive('32,900원 결제하기'), isTrue);
-    expect(p.isSensitive('보내기'), isTrue);
-    expect(p.isSensitive('Send'), isTrue);
-    expect(p.isSensitive('장바구니 담기'), isFalse);
-    expect(p.isSensitive('구매하기'), isFalse);
-    expect(p.isSensitive('보낸편지함'), isFalse);
-    expect(p.isSensitive('Sent'), isFalse);
+    const coupang = 'https://m.coupang.com/cart';
+    expect(p.authorize('결제하기', url: coupang), contains('request_approval(kind: purchase)'));
+
+    p.grant(ApprovalKind.sendEmail, content: '메일 전송 승인', url: coupang);
+    expect(p.authorize('결제하기', url: coupang), contains('다시 승인')); // 종류가 다른 승인
+    expect(p.authorize('결제하기', url: coupang), isNotNull); // 막히면서 승인도 소진됨
+
+    p.grant(ApprovalKind.purchase, content: '생수 12개 · 8,900원', url: coupang);
+    expect(p.authorize('결제하기', url: 'https://m.gmarket.co.kr/'), contains('gmarket.co.kr'));
+
+    p.grant(ApprovalKind.purchase, content: '생수 12개 · 8,900원', url: coupang);
+    expect(p.authorize('32,900원 결제하기', url: 'https://checkout.coupang.com/'), contains('32,900원'));
+
+    p.grant(ApprovalKind.purchase, content: '생수 12개 · 8,900원', url: coupang);
+    expect(p.authorize('8,900원 결제하기', url: 'https://checkout.coupang.com/'), isNull);
+
+    p.grant(ApprovalKind.other, content: '카페 글 게시', url: 'https://m.cafe.naver.com/');
+    expect(p.authorize('결제하기', url: 'https://m.cafe.naver.com/'), contains('kind: purchase'));
+    p.grant(ApprovalKind.booking, content: 'CGV 2매 28,000원', url: 'https://www.cgv.co.kr/');
+    expect(p.authorize('28,000원 결제하기', url: 'https://m.cgv.co.kr/'), isNull);
+    expect(p.authorize('장바구니 담기'), isNull);
+
+    expect(SafetyPolicy.siteOf('https://m.11st.co.kr/'), '11st.co.kr');
+    expect(SafetyPolicy.siteOf('https://www.gov.kr/'), 'gov.kr');
+  });
+
+  test('승인한 금액과 버튼 금액이 다르면 누르지 않는다', () async {
+    final llm = _ScriptedLlm([
+      _call('request_approval', {'kind': 'purchase', 'title': '결제', 'summary': '생수 9,900원'}, 'a'),
+      _call('click', {'element_id': 2}, 'b'),
+      const LlmResponse(text: '끝'),
+    ]);
+    final browser = _FakeBrowser()..labels[2] = '12,900원 결제하기';
+    await AgentRunner(llm: llm, browser: browser, hooks: _Hooks(), systemPrompt: 's').run('x');
+    expect(browser.clicked, isEmpty);
+    expect(_lastToolResult(llm.seen[2]), contains('12,900원'));
+  });
+
+  test('승인 종류 문자열은 앱·서버·도구 정의가 같다', () {
+    final spec = AgentTools.specs.firstWhere((s) => s.name == AgentTools.requestApproval);
+    final kinds = ((spec.parameters['properties'] as Map)['kind'] as Map)['enum'] as List;
+    expect(kinds, [for (final k in ApprovalKind.values) k.wire]);
+    for (final k in ApprovalKind.values) {
+      expect(ApprovalKind.parse(k.wire), k);
+    }
   });
 
   test('승인 없이 결제 버튼 클릭은 차단되고, 승인 후 1회만 허용된다', () async {

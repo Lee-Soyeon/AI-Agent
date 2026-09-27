@@ -44,7 +44,7 @@ class AgentTools {
     const ToolSpec(
       name: click,
       description:
-          '요소를 클릭한다. 결제/주문 확정/메일 보내기 버튼은 request_approval 로 승인받은 뒤에만 누를 수 있다. '
+          '요소를 클릭한다. 결제·주문 확정·전송·예약 확정·게시·제출·해지 버튼은 request_approval 로 승인받은 뒤에만 누를 수 있다. '
           '결과로 새 페이지 스냅샷을 돌려준다.',
       parameters: {
         'type': 'object',
@@ -89,16 +89,32 @@ class AgentTools {
     const ToolSpec(
       name: requestApproval,
       description:
-          '결제, 주문 확정, 이메일 전송 등 되돌릴 수 없는 동작 직전에 사용자에게 승인을 요청한다. '
-          '사용자가 판단할 수 있도록 모든 핵심 정보를 빠짐없이 넣어야 한다. '
-          '구매: 상품명·옵션·수량·단가·총 결제금액·배송지·결제수단. 이메일: 받는 사람·참조·제목·본문 전체. '
-          '승인되면 해당 버튼을 10분 안에 한 번 누를 수 있다.',
+          '결제, 주문 확정, 전송, 예약 확정, 글 게시, 지원서 제출, 취소·해지·탈퇴 등 되돌릴 수 없는 동작 직전에 '
+          '사용자에게 승인을 요청한다. 사용자가 판단할 수 있도록 모든 핵심 정보를 빠짐없이 넣어야 한다. '
+          '구매: 상품명·옵션·수량·단가·총 결제금액·배송지·결제수단. 예약: 날짜·시간·인원·금액·취소 수수료. '
+          '게시·전송: 받는 사람 또는 공개 범위·본문 전체. '
+          '승인은 kind 에 맞는 버튼만, 승인받은 사이트에서, 10분 안에 한 번 누를 수 있다. '
+          '버튼에 적힌 금액이 승인 내용에 없으면 막히므로 총 결제금액을 정확히 적어라.',
       parameters: {
         'type': 'object',
         'properties': {
           'kind': {
             'type': 'string',
-            'enum': ['purchase', 'send_email', 'other'],
+            // ApprovalKind.wire 와 같은 값
+            'enum': [
+              'purchase',
+              'send_email',
+              'send_message',
+              'booking',
+              'post',
+              'submit',
+              'terminate',
+              'other',
+            ],
+            'description':
+                'purchase=결제·주문, send_email/send_message=전송, booking=예약·예매 확정(결제 포함), '
+                'post=글·댓글·리뷰 게시, submit=지원·제출, terminate=주문·예약 취소·구독 해지·탈퇴, '
+                'other=그 밖의 동작(결제·전송에는 쓸 수 없음)',
           },
           'title': {'type': 'string', 'description': '한 줄 제목 (예: "쿠팡 결제 승인 요청")'},
           'summary': {'type': 'string', 'description': '핵심 요약 (여러 줄 가능)'},

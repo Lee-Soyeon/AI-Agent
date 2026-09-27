@@ -16,19 +16,25 @@ class AgentLogEntry {
   final DateTime time;
 }
 
+/// 승인 종류. 종류마다 누를 수 있는 버튼이 정해져 있다 (`SafetyPolicy.allowed`).
 enum ApprovalKind {
-  purchase('구매/결제'),
-  sendEmail('이메일 전송'),
-  other('기타 중요한 동작');
+  purchase('purchase', '구매/결제'),
+  sendEmail('send_email', '이메일 전송'),
+  sendMessage('send_message', '메시지 전송'),
+  booking('booking', '예약/예매'),
+  post('post', '글 게시'),
+  submit('submit', '지원/제출'),
+  terminate('terminate', '취소/해지/탈퇴'),
+  other('other', '기타 중요한 동작');
 
-  const ApprovalKind(this.label);
+  const ApprovalKind(this.wire, this.label);
+
+  /// request_approval 의 kind 값.
+  final String wire;
   final String label;
 
-  static ApprovalKind parse(Object? v) => switch (v) {
-    'purchase' => ApprovalKind.purchase,
-    'send_email' => ApprovalKind.sendEmail,
-    _ => ApprovalKind.other,
-  };
+  static ApprovalKind parse(Object? v) =>
+      values.firstWhere((k) => k.wire == v, orElse: () => ApprovalKind.other);
 }
 
 class ApprovalRequest {

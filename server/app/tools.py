@@ -1,4 +1,5 @@
 from .llm import ToolSpec
+from .safety import KIND_LABELS
 
 _ELEMENT_ID = {"type": "integer", "description": "가장 최근 페이지 스냅샷의 요소 id (예: [12] 이면 12)"}
 
@@ -7,7 +8,7 @@ TOOLS = [
              {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}),
     ToolSpec("read_page", "현재 페이지의 텍스트와 조작 가능한 요소 목록(id 포함)을 읽는다.",
              {"type": "object", "properties": {}}),
-    ToolSpec("click", "요소를 클릭한다. 결제·주문 확정·전송·예약 확정 버튼은 request_approval 로 승인받은 뒤에만 누를 수 있다.",
+    ToolSpec("click", "요소를 클릭한다. 결제·주문 확정·전송·예약 확정·게시·제출·해지 버튼은 request_approval 로 승인받은 뒤에만 누를 수 있다.",
              {"type": "object", "properties": {"element_id": _ELEMENT_ID}, "required": ["element_id"]}),
     ToolSpec("type_text", "입력창에 텍스트를 넣거나 select 옵션을 고른다. 비밀번호 칸에는 입력할 수 없다.",
              {"type": "object", "properties": {
@@ -20,11 +21,15 @@ TOOLS = [
               "required": ["direction"]}),
     ToolSpec("go_back", "뒤로 가기.", {"type": "object", "properties": {}}),
     ToolSpec("request_approval",
-             "결제·주문 확정·메일 전송·예약 확정 등 되돌릴 수 없는 동작 직전에 사용자 승인을 요청한다. "
-             "상품·수량·금액·배송지 또는 받는 사람·본문 등 판단에 필요한 정보를 빠짐없이 넣는다. "
-             "승인되면 해당 버튼을 10분 안에 한 번 누를 수 있다.",
+             "결제·주문 확정·전송·예약 확정·글 게시·지원서 제출·취소·해지·탈퇴 등 되돌릴 수 없는 동작 직전에 사용자 승인을 요청한다. "
+             "상품·수량·금액·배송지, 예약 날짜·시간·인원·취소 수수료, 받는 사람·공개 범위·본문 등 판단에 필요한 정보를 빠짐없이 넣는다. "
+             "승인은 kind 에 맞는 버튼만, 승인받은 사이트에서, 10분 안에 한 번 누를 수 있다. "
+             "버튼에 적힌 금액이 승인 내용에 없으면 막히므로 총 결제금액을 정확히 적어라.",
              {"type": "object", "properties": {
-                 "kind": {"type": "string", "enum": ["purchase", "send_email", "other"]},
+                 "kind": {"type": "string", "enum": list(KIND_LABELS),
+                          "description": "purchase=결제·주문, send_email/send_message=전송, booking=예약·예매 확정(결제 포함), "
+                                         "post=글·댓글·리뷰 게시, submit=지원·제출, terminate=주문·예약 취소·구독 해지·탈퇴, "
+                                         "other=그 밖의 동작(결제·전송에는 쓸 수 없음)"},
                  "title": {"type": "string"},
                  "summary": {"type": "string"},
                  "details": {"type": "string"},

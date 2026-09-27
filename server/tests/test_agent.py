@@ -1,8 +1,10 @@
 import asyncio
+import json
+from pathlib import Path
 
 from app.agent import SNAPSHOT_HEADER, AgentRunner, Task, compact_history
 from app.llm import LlmResponse, Message
-from app.safety import SafetyPolicy
+from app.safety import ALLOWED, KIND_LABELS, SafetyPolicy, classify, site_of
 
 from .fakes import FakeBrowser, ScriptedLlm, call, last_tool_result
 
@@ -17,12 +19,44 @@ async def run_with_decisions(runner: AgentRunner, task: Task, prompt: str, decis
     await job
 
 
-def test_sensitive_patterns():
+def test_sensitive_labels_match_shared_table():
+    """앱(safety.dart)과 같은 표로 검사해 두 규칙이 어긋나지 않게 한다."""
+    table = json.loads((Path(__file__).parent / "sensitive_labels.json").read_text(encoding="utf-8"))
+    wrong = [(label, want, classify(label)) for label, want in table["labels"] if classify(label) != want]
+    assert not wrong, wrong
+    assert list(KIND_LABELS) == table["approval_kinds"] == list(ALLOWED)
+
+
+def test_grant_is_bound_to_kind_site_and_amount():
     p = SafetyPolicy()
-    for s in ["결제하기", "32,900원 결제하기", "보내기", "Send", "예약 확정", "회원 탈퇴"]:
-        assert p.is_sensitive(s), s
-    for s in ["장바구니 담기", "구매하기", "보낸편지함", "Sent", "예약 가능 시간 보기"]:
-        assert not p.is_sensitive(s), s
+    coupang = "https://m.coupang.com/cart"
+    assert "request_approval(kind: purchase)" in p.authorize("결제하기", coupang)
+
+    p.grant("send_email", "메일 전송 승인", coupang)
+    assert "다시 승인" in p.authorize("결제하기", coupang)  # 종류가 다른 승인
+    assert p.authorize("결제하기", coupang)  # 막히면서 승인도 소진됨
+
+    p.grant("purchase", "생수 12개 · 8,900원", coupang)
+    assert "gmarket.co.kr" in p.authorize("결제하기", "https://m.gmarket.co.kr/")  # 다른 사이트
+
+    p.grant("purchase", "생수 12개 · 8,900원", coupang)
+    assert "32,900원" in p.authorize("32,900원 결제하기", "https://checkout.coupang.com/")  # 금액이 바뀜
+
+    p.grant("purchase", "생수 12개 · 8,900원", coupang)
+    assert p.authorize("8,900원 결제하기", "https://checkout.coupang.com/") is None  # 같은 사이트·같은 금액
+
+    p.grant("other", "카페 글 게시", "https://m.cafe.naver.com/")
+    assert "kind: purchase" in p.authorize("결제하기", "https://m.cafe.naver.com/")  # 기타 승인으로는 결제 불가
+    p.grant("booking", "CGV 2매 28,000원", "https://www.cgv.co.kr/")
+    assert p.authorize("28,000원 결제하기", "https://m.cgv.co.kr/") is None  # 예약 승인은 마지막 결제까지
+    assert p.authorize("장바구니 담기") is None
+
+
+def test_site_of():
+    assert site_of("https://m.coupang.com/x") == "coupang.com"
+    assert site_of("https://m.11st.co.kr/") == "11st.co.kr"
+    assert site_of("https://www.gov.kr/") == "gov.kr"
+    assert site_of(None) is None
 
 
 async def test_payment_click_blocked_until_approved_and_only_once():
@@ -140,3 +174,17 @@ async def test_payment_fields_are_refused():
     llm = ScriptedLlm([call("type_text", {"element_id": 4, "text": "1234"}), LlmResponse(text="끝")])
     await AgentRunner(llm, FakeBrowser()).run(Task("x"), "x")
     assert "handoff_payment" in last_tool_result(llm.seen[1])
+
+
+async def test_click_blocked_when_approved_amount_differs():
+    llm = ScriptedLlm([
+        call("request_approval", {"kind": "purchase", "title": "결제", "summary": "생수 9,900원"}, "a"),
+        call("click", {"element_id": 2}, "b"),
+        LlmResponse(text="끝"),
+    ])
+    browser = FakeBrowser()
+    browser.labels[2] = "12,900원 결제하기"
+    task = Task("x")
+    await run_with_decisions(AgentRunner(llm, browser), task, "x", [{"approved": True}])
+    assert browser.clicked == []
+    assert "12,900원" in last_tool_result(llm.seen[2])

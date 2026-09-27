@@ -318,14 +318,16 @@ class _ApprovalCardState extends State<_ApprovalCard> {
             children: [
               Row(
                 children: [
-                  Icon(
-                    r.kind == ApprovalKind.purchase
-                        ? Icons.payments
-                        : r.kind == ApprovalKind.sendEmail
-                        ? Icons.outgoing_mail
-                        : Icons.warning_amber,
-                    color: AppTokens.of(context).warningInk,
-                  ),
+                  Icon(switch (r.kind) {
+                    ApprovalKind.purchase => Icons.payments,
+                    ApprovalKind.sendEmail => Icons.outgoing_mail,
+                    ApprovalKind.sendMessage => Icons.send,
+                    ApprovalKind.booking => Icons.event_available,
+                    ApprovalKind.post => Icons.public,
+                    ApprovalKind.submit => Icons.assignment_turned_in,
+                    ApprovalKind.terminate => Icons.cancel,
+                    ApprovalKind.other => Icons.warning_amber,
+                  }, color: AppTokens.of(context).warningInk),
                   const SizedBox(width: 8),
                   Expanded(child: Text(r.title, style: Theme.of(context).textTheme.titleMedium)),
                   Chip(label: Text(r.kind.label)),
