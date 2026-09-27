@@ -52,3 +52,6 @@ server/data/
 server/.env
 **/__pycache__/
 .pytest_cache/
+
+# 조사 스크립트 결과물
+research/out/
