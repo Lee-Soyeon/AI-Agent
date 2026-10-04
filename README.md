@@ -7,6 +7,8 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
   - Gmail: 공식 **Google 로그인**으로 계정을 연결하면, 에이전트가 **Gmail API**로 메일을 검색·읽기·전송합니다.
     보낸 메일로 **내 말투를 학습**해 인사말·호칭·어미·서명까지 내가 쓴 것처럼 답장합니다.
 - **나머지는 에이전트가 알아서 처리합니다.** 상품 검색, 장바구니 담기, 메일 요약, 답장 작성 등.
+- **업무 필터 → Slack**: 에이닷(통화 요약)이나 문자에서 "공유" 버튼으로 보낸 내용을 LLM 이 업무 관련인지 판단해, 업무 관련인 것만 Slack 채널로 전달합니다.
+  설정은 [docs/work-filter-slack-setup.md](docs/work-filter-slack-setup.md) 참고 (iOS 는 Share Extension 추가가 한 번 필요합니다).
 - **결제와 메일 전송은 반드시 사용자 승인 후에만 합니다.** 이 규칙은 프롬프트뿐 아니라 코드에서도 강제됩니다.
 - **대화는 버리지 않고 남습니다.** **채팅** 탭에서 지난 작업을 다시 열어 로그·결과를 보고 그대로 이어서 지시할 수 있습니다.
   앱(또는 서버)을 껐다 켜도 LLM 대화까지 남아 있어 이어갈 수 있습니다 (밀어서 삭제).
@@ -92,6 +94,14 @@ lib/
 │   └── agent_controller.dart     # UI 상태 (ChangeNotifier)
 ├── remote/
 │   └── agent_server_client.dart  # 서버 REST 클라이언트
+├── slack/
+│   ├── slack_api.dart             # Slack Web API (Bot Token): auth.test, conversations.list, chat.postMessage
+│   └── slack_store.dart           # Slack 연결 상태(토큰·채널) 저장
+├── workfilter/                    # 업무 필터 → Slack (docs/work-filter-slack-setup.md)
+│   ├── work_filter_models.dart    #   공유 항목 모델(SharedItem), 분류 결과
+│   ├── work_filter_store.dart     #   처리 기록 저장
+│   ├── work_filter_service.dart   #   LLM 분류 + Slack 전송 오케스트레이션
+│   └── share_intent_controller.dart # 공유 시트(에이닷/문자 → 이 앱)로 들어온 텍스트 수신
 └── ui/
     ├── home_screen.dart          # 로그인 상태, 작업 입력, 예시
     ├── remote_browser_screen.dart # 서버 브라우저 실시간 화면 (로그인·사용자 도움)
@@ -211,6 +221,7 @@ API 키 대신 ChatGPT 구독 사용량으로 에이전트를 돌릴 수 있습�
 - **쿠팡**: 자동화 접근은 쿠팡 이용약관과 봇 탐지 정책의 영향을 받을 수 있습니다. 화면 구조가 바뀌어도 LLM 이 스냅샷을 보고 판단하므로 셀렉터를 하드코딩하지 않았지만, 결제 비밀번호(쿠페이) 입력은 항상 사용자에게 넘깁니다.
 - **백그라운드 실행**: 에이전트는 화면에 보이지 않는 웹뷰에서 동작하므로 앱 안에서는 다른 화면을 봐도 계속 진행됩니다. 다만 앱 자체를 내리면 iOS 는 곧 실행을 멈추고, Android 도 절전 정책에 따라 멈출 수 있습니다. 완전한 백그라운드 실행이 필요하면 Android Foreground Service, 알림(승인 요청 푸시) 등을 추가해야 합니다.
 - **도움 요청 시 페이지 상태**: 캡차·결제 비밀번호 등으로 사용자에게 넘길 때 같은 URL 을 보이는 브라우저에서 새로 엽니다. URL 에 담기지 않은 화면 상태(예: 결제 팝업)는 다시 열어야 할 수 있습니다.
+- **업무 필터(에이닷/문자 → Slack)**: iOS·Android 모두 다른 앱의 데이터를 몰래 백그라운드로 읽어오는 기능은 없습니다 (iOS 정책상 불가능). 사람이 공유 시트에서 이 앱을 한 번 선택해야 그 뒤부터 분류·Slack 전송이 자동으로 됩니다. iOS 는 Share Extension 추가가 한 번 필요합니다 ([docs/work-filter-slack-setup.md](docs/work-filter-slack-setup.md)).
 
 ## 새 사이트 추가
 

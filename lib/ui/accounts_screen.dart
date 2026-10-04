@@ -7,11 +7,13 @@ import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
 import '../services/service_catalog.dart';
+import '../slack/slack_store.dart';
 import 'app_theme.dart';
 import 'browser_screen.dart';
 import 'main_shell.dart';
 import 'remote_browser_screen.dart';
 import 'services_screen.dart';
+import 'work_filter_screen.dart';
 import 'writing_style_screen.dart';
 
 /// 로그인 탭: 에이전트가 대신 쓸 서비스에 로그인하고 관리한다.
@@ -82,6 +84,7 @@ class AccountsScreen extends StatelessWidget {
                 ),
               ),
           if (!settings.runOnServer) _GmailCard(google: google),
+          _WorkFilterCard(slack: context.watch<SlackStore>()),
           Card(
             child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.apps)),
@@ -199,6 +202,29 @@ class _ServerBrowserCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WorkFilterCard extends StatelessWidget {
+  const _WorkFilterCard({required this.slack});
+
+  final SlackStore slack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.filter_alt_outlined)),
+        title: const Text('업무 필터 → Slack'),
+        subtitle: Text(
+          slack.isConnected
+              ? 'Slack 연결됨 · #${slack.channelName.isEmpty ? '채널 선택 필요' : slack.channelName}'
+              : '에이닷/문자 공유 내용 중 업무 관련만 Slack으로 전달',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkFilterScreen())),
       ),
     );
   }
