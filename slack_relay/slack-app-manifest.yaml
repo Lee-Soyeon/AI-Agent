@@ -1,0 +1,18 @@
+display_information:
+  name: AI Agent 업무 필터
+  description: 통화 요약/문자 중 업무 관련 내용만 골라 Slack 채널로 전달합니다.
+  background_color: "#1a1a1a"
+oauth_config:
+  redirect_urls:
+    # 아래를 slack_relay 를 배포한 실제 Worker 주소로 바꾸세요.
+    # (먼저 `npx wrangler deploy` 로 주소를 확인한 뒤 이 매니페스트를 만드는 걸 추천합니다.)
+    - https://REPLACE-WITH-YOUR-WORKER-URL.workers.dev/slack/oauth/callback
+  scopes:
+    bot:
+      - chat:write
+      - channels:read
+      - groups:read
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

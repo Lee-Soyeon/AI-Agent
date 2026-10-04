@@ -33,9 +33,10 @@ Slack Bot Token 으로 채널에 전송
 Client Secret을 보관하고 code→token 교환을 대신해 줄 아주 작은 중계 서버가 필요합니다 (Cloudflare Workers 무료 플랜으로 충분).
 설정 방법은 [slack_relay/README.md](../slack_relay/README.md)에 있습니다. 요약하면:
 
-1. Slack App을 **한 번만** 만들고 "Activate Public Distribution"을 켭니다 (여러 워크스페이스에서 설치 가능하게 — Slack 심사는 필요 없습니다).
-2. `slack_relay/` 를 Cloudflare Workers에 배포합니다 (`npx wrangler deploy`).
-3. 앱을 빌드할 때 그 Worker 주소를 넣습니다:
+1. `slack_relay/` 를 Cloudflare Workers에 먼저 배포해 Worker 주소를 받습니다 (`npx wrangler deploy`).
+2. `slack_relay/slack-app-manifest.yaml` 에 그 주소를 채워 넣고, Slack **Create New App → From an app manifest** 로 붙여넣어 앱을 만듭니다 (scope·Redirect URL이 이미 다 채워져 있어 따로 설정할 게 없습니다). 이어서 "Activate Public Distribution"을 켭니다 (여러 워크스페이스 설치 가능, Slack 심사 불필요).
+3. 받은 Client ID/Secret을 Worker에 넣습니다 (`npx wrangler secret put ...`).
+4. 앱을 빌드할 때 그 Worker 주소를 넣습니다:
    ```bash
    flutter build ios --dart-define=SLACK_RELAY_URL=https://ai-agent-slack-relay.<your-subdomain>.workers.dev
    ```

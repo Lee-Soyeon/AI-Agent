@@ -14,32 +14,41 @@ Slack OAuth는 code→token 교환에 **Client Secret**이 필요하고, Slack �
 이 Worker가 그 역할(비밀값 보관 + 교환 대행)만 **하나만** 전담합니다 — 에이전트 실행 자체와는 무관합니다
 (`server/` 와는 완전히 다른, 별개의 아주 작은 서비스입니다).
 
-## 1. Slack App 만들기 (한 번만)
+아래 순서대로 하면 **Worker 주소를 먼저 확보한 뒤** 그 주소가 이미 채워진 매니페스트로 Slack App을 만들기 때문에,
+나중에 Redirect URL을 다시 고칠 필요가 없습니다.
 
-1. https://api.slack.com/apps → **Create New App** → From scratch
-2. **OAuth & Permissions** → **Scopes → Bot Token Scopes** 에 추가: `chat:write`, `channels:read`, `groups:read`
-3. **OAuth & Permissions → Redirect URLs** 에 아래 3번에서 배포한 Worker 주소 + `/slack/oauth/callback` 추가
-   (예: `https://ai-agent-slack-relay.<your-subdomain>.workers.dev/slack/oauth/callback`)
-4. **Manage Distribution** → **Activate Public Distribution** (여러 워크스페이스에서 설치 가능하게. Slack 심사는 필요 없습니다 —
-   심사는 Slack 마켓플레이스에 "등록"할 때만 필요합니다)
-5. **Basic Information** 에서 **Client ID**, **Client Secret** 확인
-
-## 2. 배포 (Cloudflare)
+## 1. Worker 먼저 배포해서 주소 확보
 
 ```bash
 cd slack_relay
 npm install
 npx wrangler login
 npx wrangler kv namespace create OAUTH_STATE   # 출력된 id 를 wrangler.toml 의 id 에 넣기
-npx wrangler secret put SLACK_CLIENT_ID
-npx wrangler secret put SLACK_CLIENT_SECRET
 npx wrangler deploy
 ```
 
-배포가 끝나면 `https://ai-agent-slack-relay.<your-subdomain>.workers.dev` 같은 주소가 나옵니다.
-이 주소를 **1-3번의 Redirect URL**에 정확히 맞춰 넣어주세요 (워커 재배포 후 주소가 바뀌면 같이 업데이트).
+마지막 명령 출력에 `https://ai-agent-slack-relay.<your-subdomain>.workers.dev` 같은 주소가 나옵니다 (아직 Slack 비밀값을
+안 넣은 상태라 `/slack/oauth/*` 호출은 실패하지만, 배포 자체는 문제없이 됩니다). 이 주소를 적어두세요.
 
-## 3. 앱에 연결하기
+## 2. Slack App 만들기 — 매니페스트로 한 번에
+
+1. `slack-app-manifest.yaml` 을 열어 `REPLACE-WITH-YOUR-WORKER-URL` 부분을 1번에서 받은 실제 주소로 바꿉니다.
+2. https://api.slack.com/apps → **Create New App** → **From an app manifest** → 워크스페이스 선택
+3. 수정한 `slack-app-manifest.yaml` 내용을 그대로 붙여넣기 (YAML/JSON 탭 전환 가능) → **Next** → **Create**
+4. **Manage Distribution** → **Activate Public Distribution** (여러 워크스페이스에서 설치 가능하게. Slack 심사는 필요 없습니다 —
+   심사는 Slack 마켓플레이스에 "등록"할 때만 필요합니다)
+5. **Basic Information** 에서 **Client ID**, **Client Secret** 확인
+
+## 3. Worker에 Slack 비밀값 넣기
+
+```bash
+npx wrangler secret put SLACK_CLIENT_ID
+npx wrangler secret put SLACK_CLIENT_SECRET
+```
+
+재배포 없이 바로 적용됩니다. (`npx wrangler dev` 로 로컬 테스트할 때는 `.dev.vars` 에 같은 값을 넣으세요 — `.dev.vars.example` 참고.)
+
+## 4. 앱에 연결하기
 
 Flutter 앱 빌드 시 이 Worker 주소를 넣어줍니다:
 
