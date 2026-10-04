@@ -1,5 +1,4 @@
 import 'package:ai_agent/llm/llm_types.dart';
-import 'package:ai_agent/workfilter/work_filter_models.dart';
 import 'package:ai_agent/workfilter/work_filter_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,12 +19,6 @@ class _ScriptedLlm implements LlmProvider {
     seen.add(List.of(messages));
     return LlmResponse(text: text);
   }
-}
-
-SharedItem _fakeItem() {
-  final item = SharedItem(id: '1', receivedAt: DateTime.now(), rawText: '원문 내용입니다');
-  item.classification = const WorkClassification(isWork: true, contentType: '통화', summary: '요약 테스트');
-  return item;
 }
 
 void main() {
@@ -49,13 +42,5 @@ void main() {
   test('형식이 완전히 깨지면 예외를 던진다', () async {
     final llm = _ScriptedLlm('');
     expect(() => service.classify('텍스트', llm), throwsA(isA<WorkFilterException>()));
-  });
-
-  test('Slack 메시지 본문에 요약과 원문 인용이 들어간다', () {
-    final msg = service.buildSlackMessage(_fakeItem());
-    expect(msg, contains('업무'));
-    expect(msg, contains('통화'));
-    expect(msg, contains('요약 테스트'));
-    expect(msg, contains('> '));
   });
 }

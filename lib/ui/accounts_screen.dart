@@ -6,8 +6,8 @@ import '../browser/sites.dart';
 import '../core/settings_store.dart';
 import '../google/google_auth.dart';
 import '../google/writing_style.dart';
+import '../github/github_store.dart';
 import '../services/service_catalog.dart';
-import '../slack/slack_store.dart';
 import 'app_theme.dart';
 import 'browser_screen.dart';
 import 'main_shell.dart';
@@ -84,7 +84,7 @@ class AccountsScreen extends StatelessWidget {
                 ),
               ),
           if (!settings.runOnServer) _GmailCard(google: google),
-          _WorkFilterCard(slack: context.watch<SlackStore>()),
+          _WorkFilterCard(github: context.watch<GithubStore>()),
           Card(
             child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.apps)),
@@ -208,20 +208,20 @@ class _ServerBrowserCard extends StatelessWidget {
 }
 
 class _WorkFilterCard extends StatelessWidget {
-  const _WorkFilterCard({required this.slack});
+  const _WorkFilterCard({required this.github});
 
-  final SlackStore slack;
+  final GithubStore github;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
         leading: const CircleAvatar(child: Icon(Icons.filter_alt_outlined)),
-        title: const Text('업무 필터 → Slack'),
+        title: const Text('업무 필터 → GitHub'),
         subtitle: Text(
-          slack.isConnected
-              ? 'Slack 연결됨 · #${slack.channelName.isEmpty ? '채널 선택 필요' : slack.channelName}'
-              : '에이닷/문자 공유 내용 중 업무 관련만 Slack으로 전달',
+          github.isConnected
+              ? 'GitHub 연결됨 · ${github.owner}/${github.repo}'
+              : '에이닷/문자 공유 내용 중 업무 관련만 모아 GitHub PR로 전달',
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkFilterScreen())),

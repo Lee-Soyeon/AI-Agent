@@ -1,7 +1,8 @@
 /// 공유된 통화/문자 내용 한 건의 처리 상태.
 enum ShareItemStatus { processing, done, error }
 
-enum SlackSendStatus { notSent, sent, skippedNotWork, failed }
+/// GitHub PR 업로드 상태. 분류는 들어오는 즉시 되지만, 실제 업로드는 하루치를 모아 한 번에 한다.
+enum UploadStatus { pending, uploaded, skippedNotWork, failed }
 
 /// LLM 이 판단한 분류 결과.
 class WorkClassification {
@@ -33,7 +34,8 @@ class SharedItem {
     required this.rawText,
     this.status = ShareItemStatus.processing,
     this.classification,
-    this.slackStatus = SlackSendStatus.notSent,
+    this.uploadStatus = UploadStatus.pending,
+    this.prUrl,
     this.error,
   });
 
@@ -42,11 +44,19 @@ class SharedItem {
   final String rawText;
   ShareItemStatus status;
   WorkClassification? classification;
-  SlackSendStatus slackStatus;
+  UploadStatus uploadStatus;
+  String? prUrl;
   String? error;
 
-  String get preview =>
-      rawText.length > 80 ? '${rawText.substring(0, 80).replaceAll('\n', ' ')}…' : rawText.replaceAll('\n', ' ');
+  /// 하루 단위 묶음 키 (로컬 날짜, YYYY-MM-DD).
+  String get dayKey =>
+      '${receivedAt.year.toString().padLeft(4, '0')}-'
+      '${receivedAt.month.toString().padLeft(2, '0')}-'
+      '${receivedAt.day.toString().padLeft(2, '0')}';
+
+  String get preview => rawText.length > 80
+      ? '${rawText.substring(0, 80).replaceAll('\n', ' ')}…'
+      : rawText.replaceAll('\n', ' ');
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -54,7 +64,8 @@ class SharedItem {
     'rawText': rawText,
     'status': status.name,
     if (classification != null) 'classification': classification!.toJson(),
-    'slackStatus': slackStatus.name,
+    'uploadStatus': uploadStatus.name,
+    if (prUrl != null) 'prUrl': prUrl,
     if (error != null) 'error': error,
   };
 
@@ -66,7 +77,8 @@ class SharedItem {
     classification: j['classification'] == null
         ? null
         : WorkClassification.fromJson((j['classification'] as Map).cast<String, dynamic>()),
-    slackStatus: SlackSendStatus.values.asNameMap()[j['slackStatus']] ?? SlackSendStatus.notSent,
+    uploadStatus: UploadStatus.values.asNameMap()[j['uploadStatus']] ?? UploadStatus.pending,
+    prUrl: j['prUrl'] as String?,
     error: j['error'] as String?,
   );
 }

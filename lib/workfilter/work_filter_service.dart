@@ -1,6 +1,5 @@
 import '../core/settings_store.dart';
 import '../llm/llm_types.dart';
-import '../slack/slack_store.dart';
 import 'work_filter_models.dart';
 import 'work_filter_store.dart';
 
@@ -22,6 +21,8 @@ class WorkFilterException implements Exception {
   String toString() => message;
 }
 
+/// 공유된 텍스트를 받아 업무/개인 여부를 분류한다. 실제 GitHub 업로드는 하루치를 모아
+/// [GithubUploadService] 가 한 번에 처리한다 (lib/workfilter/github_upload_service.dart).
 class WorkFilterService {
   const WorkFilterService();
 
@@ -47,21 +48,11 @@ class WorkFilterService {
     );
   }
 
-  String buildSlackMessage(SharedItem item) {
-    final c = item.classification!;
-    final snippet = item.rawText.length > 500 ? '${item.rawText.substring(0, 500)}…' : item.rawText;
-    return '*[업무] ${c.contentType} 요약*\n'
-        '${c.summary}\n\n'
-        '> 원문\n'
-        '> ${snippet.replaceAll('\n', '\n> ')}';
-  }
-
-  /// 공유된 텍스트 하나를 분류하고, 업무 관련이면 Slack 으로 보낸다.
-  /// 진행 상황은 중간중간 [store] 에 저장해 화면이 바로바로 갱신되게 한다.
+  /// 공유된 텍스트 하나를 분류해 기록에 남긴다. 업무 관련이면 "업로드 대기" 상태로,
+  /// 아니면 "업로드 안 함"으로 표시된다 — 실제 GitHub 전송은 하지 않는다.
   Future<void> process({
     required SharedItem item,
     required SettingsStore settings,
-    required SlackStore slack,
     required WorkFilterStore store,
   }) async {
     await store.upsert(item);
@@ -71,23 +62,7 @@ class WorkFilterService {
       }
       final classification = await classify(item.rawText, settings.createProvider());
       item.classification = classification;
-
-      if (!classification.isWork) {
-        item.slackStatus = SlackSendStatus.skippedNotWork;
-      } else if (!slack.isConnected) {
-        item.slackStatus = SlackSendStatus.notSent;
-      } else {
-        try {
-          await slack.createApi().postMessage(
-            channel: slack.channelId,
-            text: buildSlackMessage(item),
-          );
-          item.slackStatus = SlackSendStatus.sent;
-        } catch (e) {
-          item.slackStatus = SlackSendStatus.failed;
-          item.error = '$e';
-        }
-      }
+      item.uploadStatus = classification.isWork ? UploadStatus.pending : UploadStatus.skippedNotWork;
       item.status = ShareItemStatus.done;
     } catch (e) {
       item.status = ShareItemStatus.error;

@@ -4,25 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../core/settings_store.dart';
-import '../slack/slack_store.dart';
 import 'work_filter_models.dart';
 import 'work_filter_service.dart';
 import 'work_filter_store.dart';
 
-/// 에이닷/문자 앱의 "공유" 버튼으로 들어온 텍스트를 받아 분류·Slack 전송까지 흘려보낸다.
+/// 에이닷/문자 앱의 "공유" 버튼으로 들어온 텍스트를 받아 분류까지 흘려보낸다.
+/// 업무 관련으로 분류된 항목은 하루치씩 모아 [GithubUploadService]로 GitHub PR에 올린다.
 ///
 /// iOS 는 Share Extension(네이티브, Xcode 에서 한 번 추가 필요)이 있어야 공유 시트에 이 앱이 나타난다.
-/// 자세한 설정은 docs/work-filter-slack-setup.md 참고.
+/// 자세한 설정은 docs/work-filter-github-setup.md 참고.
 class ShareIntentController extends ChangeNotifier {
-  ShareIntentController({
-    required this.settings,
-    required this.slack,
-    required this.store,
-    WorkFilterService? service,
-  }) : _service = service ?? const WorkFilterService();
+  ShareIntentController({required this.settings, required this.store, WorkFilterService? service})
+    : _service = service ?? const WorkFilterService();
 
   final SettingsStore settings;
-  final SlackStore slack;
   final WorkFilterStore store;
   final WorkFilterService _service;
 
@@ -55,7 +50,7 @@ class ShareIntentController extends ChangeNotifier {
         receivedAt: DateTime.now(),
         rawText: text.trim(),
       );
-      unawaited(_service.process(item: item, settings: settings, slack: slack, store: store));
+      unawaited(_service.process(item: item, settings: settings, store: store));
     }
     await ReceiveSharingIntent.instance.reset();
   }
