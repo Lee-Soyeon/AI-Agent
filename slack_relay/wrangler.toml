@@ -1,0 +1,15 @@
+name = "ai-agent-slack-relay"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# wrangler kv namespace create OAUTH_STATE 로 만든 id 를 넣으세요.
+[[kv_namespaces]]
+binding = "OAUTH_STATE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# 비밀값은 여기 적지 말고 `wrangler secret put` 으로 넣습니다:
+#   wrangler secret put SLACK_CLIENT_ID
+#   wrangler secret put SLACK_CLIENT_SECRET
+# [vars] 에는 비밀이 아닌 값만 둡니다 (선택, 기본값 있음):
+# [vars]
+# SLACK_SCOPES = "chat:write,channels:read,groups:read"

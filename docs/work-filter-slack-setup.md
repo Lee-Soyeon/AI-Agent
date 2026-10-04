@@ -22,7 +22,29 @@ LLM 이 "업무 / 개인" 판단 + 한 줄 요약 생성 (WorkFilterService)
 Slack Bot Token 으로 채널에 전송
 ```
 
-## 1. Slack 쪽 설정 (Bot Token 발급)
+## 1. Slack 연결 — 두 가지 방식
+
+이 앱을 **여러 사람에게 배포**할 생각이라면, 사람마다 Slack App을 직접 만들고 토큰을 복사하게 하는 건 너무 번거롭습니다.
+그래서 "Slack 워크스페이스 연동" 버튼 한 번으로 끝나는 **OAuth 방식**을 기본으로 두고, 직접 Bot Token을 발급받아
+붙여넣는 방식은 "고급" 옵션으로 남겨뒀습니다.
+
+### 1-A. OAuth 연동 (배포용, 추천)
+
+Client Secret을 보관하고 code→token 교환을 대신해 줄 아주 작은 중계 서버가 필요합니다 (Cloudflare Workers 무료 플랜으로 충분).
+설정 방법은 [slack_relay/README.md](../slack_relay/README.md)에 있습니다. 요약하면:
+
+1. Slack App을 **한 번만** 만들고 "Activate Public Distribution"을 켭니다 (여러 워크스페이스에서 설치 가능하게 — Slack 심사는 필요 없습니다).
+2. `slack_relay/` 를 Cloudflare Workers에 배포합니다 (`npx wrangler deploy`).
+3. 앱을 빌드할 때 그 Worker 주소를 넣습니다:
+   ```bash
+   flutter build ios --dart-define=SLACK_RELAY_URL=https://ai-agent-slack-relay.<your-subdomain>.workers.dev
+   ```
+4. 이후 모든 사용자는 **업무 필터 → Slack** 화면에서 "Slack 워크스페이스 연동" 버튼만 누르면 됩니다
+   (브라우저에서 워크스페이스 선택 → 허용 → 자동으로 앱에 연결).
+
+`SLACK_RELAY_URL`을 빌드 시 넣지 않으면 이 버튼은 아예 보이지 않고, 1-B(직접 토큰 입력)만 쓸 수 있습니다.
+
+### 1-B. 직접 Bot Token 입력 (고급, 중계 서버 없이도 됨)
 
 1. https://api.slack.com/apps → **Create New App** → From scratch → 워크스페이스 선택
 2. 왼쪽 메뉴 **OAuth & Permissions** → **Scopes → Bot Token Scopes** 에 추가:
@@ -37,7 +59,7 @@ Slack Bot Token 으로 채널에 전송
 
 앱 → **로그인** 탭 → **업무 필터 → Slack** 카드 → 들어가서:
 
-1. Bot Token(`xoxb-...`) 붙여넣기 → **연결**
+1. "Slack 워크스페이스 연동" 버튼(1-A 설정을 했다면) 또는 "직접 Bot Token 입력"(1-B)으로 연결
 2. **보낼 채널 선택** → 목록에서 1번에서 초대한 채널 선택
 3. **텍스트로 테스트** 칸에 통화 요약/문자 내용을 복사해 붙여넣고 **분류 + 전송 테스트** 눌러서,
    공유 시트 설정 없이도 분류·Slack 전송이 되는지 먼저 확인하세요.

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/settings_store.dart';
 import '../slack/slack_api.dart';
+import '../slack/slack_oauth_service.dart';
 import '../slack/slack_store.dart';
 import '../workfilter/work_filter_models.dart';
 import '../workfilter/work_filter_service.dart';
@@ -25,6 +27,7 @@ class _WorkFilterScreenState extends State<WorkFilterScreen> {
   bool _connecting = false;
   bool _testing = false;
   String? _connectError;
+  bool _showManualToken = !SlackOAuthService.isConfigured;
 
   @override
   void dispose() {
@@ -47,6 +50,32 @@ class _WorkFilterScreenState extends State<WorkFilterScreen> {
       _connectError = '$e';
     }
     if (mounted) setState(() => _connecting = false);
+  }
+
+  Future<void> _connectOAuth() async {
+    final service = SlackOAuthService();
+    final messenger = ScaffoldMessenger.of(context);
+    SlackOAuthStart start;
+    try {
+      start = await service.start();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    final opened = await launchUrl(Uri.parse(start.authorizeUrl), mode: LaunchMode.externalApplication);
+    if (!opened) {
+      messenger.showSnackBar(const SnackBar(content: Text('브라우저를 열지 못했습니다.')));
+      return;
+    }
+    if (!mounted) return;
+    final result = await showDialog<SlackOAuthResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SlackOAuthWaitingDialog(service: service, state: start.state),
+    );
+    if (result != null && mounted) {
+      await context.read<SlackStore>().connectWithOAuth(result);
+    }
   }
 
   Future<void> _pickChannel() async {
@@ -155,32 +184,53 @@ class _WorkFilterScreenState extends State<WorkFilterScreen> {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextField(
-                          controller: _tokenCtrl,
-                          obscureText: true,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Slack Bot Token',
-                            hintText: 'xoxb-...',
+                        if (SlackOAuthService.isConfigured) ...[
+                          FilledButton.icon(
+                            onPressed: _connectOAuth,
+                            icon: const Icon(Icons.link),
+                            label: const Text('Slack 워크스페이스 연동'),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        FilledButton(
-                          onPressed: _connecting ? null : _connect,
-                          child: Text(_connecting ? '연결 중…' : '연결'),
-                        ),
-                        if (_connectError != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(_connectError!, style: TextStyle(color: t.errorInk)),
+                          const SizedBox(height: 4),
+                          Text(
+                            '클릭하면 브라우저에서 Slack 워크스페이스를 고르고 승인하면 됩니다. '
+                            'Slack App을 직접 만들 필요가 없습니다.',
+                            style: TextStyle(color: t.muted, fontSize: 12),
                           ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Slack 앱을 만들어 chat:write, channels:read(비공개 채널도 쓰려면 groups:read) '
-                          '권한을 추가하고 워크스페이스에 설치하면 Bot User OAuth Token(xoxb-...)을 받습니다.',
-                          style: TextStyle(color: t.muted, fontSize: 12),
-                        ),
+                          const SizedBox(height: 4),
+                          TextButton(
+                            onPressed: () => setState(() => _showManualToken = !_showManualToken),
+                            child: Text(_showManualToken ? '직접 Bot Token 입력 접기' : '직접 Bot Token 입력 (고급)'),
+                          ),
+                        ],
+                        if (_showManualToken) ...[
+                          const SizedBox(height: 4),
+                          TextField(
+                            controller: _tokenCtrl,
+                            obscureText: true,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            decoration: const InputDecoration(
+                              labelText: 'Slack Bot Token',
+                              hintText: 'xoxb-...',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton(
+                            onPressed: _connecting ? null : _connect,
+                            child: Text(_connecting ? '연결 중…' : '연결'),
+                          ),
+                          if (_connectError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(_connectError!, style: TextStyle(color: t.errorInk)),
+                            ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Slack 앱을 만들어 chat:write, channels:read(비공개 채널도 쓰려면 groups:read) '
+                            '권한을 추가하고 워크스페이스에 설치하면 Bot User OAuth Token(xoxb-...)을 받습니다.',
+                            style: TextStyle(color: t.muted, fontSize: 12),
+                          ),
+                        ],
                       ],
                     ),
             ),
@@ -224,6 +274,76 @@ class _WorkFilterScreenState extends State<WorkFilterScreen> {
           for (final item in items) _ItemCard(item: item),
         ],
       ),
+    );
+  }
+}
+
+/// Slack 승인을 기다리는 동안 보여주는 창. ChatGPT 기기 코드 로그인과 같은 "브라우저에서 승인 →
+/// 앱은 주기적으로 확인" 패턴이라 별도 딥링크 설정이 필요 없다.
+class _SlackOAuthWaitingDialog extends StatefulWidget {
+  const _SlackOAuthWaitingDialog({required this.service, required this.state});
+
+  final SlackOAuthService service;
+  final String state;
+
+  @override
+  State<_SlackOAuthWaitingDialog> createState() => _SlackOAuthWaitingDialogState();
+}
+
+class _SlackOAuthWaitingDialogState extends State<_SlackOAuthWaitingDialog> {
+  String? _error;
+  bool _cancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wait();
+  }
+
+  Future<void> _wait() async {
+    try {
+      final result = await widget.service.waitForResult(
+        widget.state,
+        isCancelled: () => _cancelled || !mounted,
+      );
+      if (mounted) Navigator.of(context).pop(result);
+    } catch (e) {
+      if (mounted && !_cancelled) setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final error = _error;
+    return AlertDialog(
+      title: const Text('Slack 연동'),
+      content: error != null
+          ? Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error))
+          : const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('브라우저에서 워크스페이스를 선택하고 "허용"을 누른 뒤 앱으로 돌아오세요.'),
+                SizedBox(height: 16),
+                LinearProgressIndicator(),
+              ],
+            ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            _cancelled = true;
+            Navigator.of(context).pop();
+          },
+          child: const Text('취소'),
+        ),
+        if (error != null)
+          FilledButton(
+            onPressed: () {
+              setState(() => _error = null);
+              _wait();
+            },
+            child: const Text('다시 확인'),
+          ),
+      ],
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'slack_api.dart';
+import 'slack_oauth_service.dart';
 
 /// Slack 연결 상태(Bot Token + 보낼 채널). 토큰은 보안 저장소, 채널은 SharedPreferences 에 저장한다.
 class SlackStore extends ChangeNotifier {
@@ -35,6 +36,17 @@ class SlackStore extends ChangeNotifier {
     final auth = await SlackApi(botToken: token.trim()).authTest();
     botToken = token.trim();
     teamName = auth.team;
+    await _secure.write(key: 'slack_botToken', value: botToken);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('slack_teamName', teamName);
+    notifyListeners();
+  }
+
+  /// OAuth 연동 결과(중계 서버가 이미 교환해 준 토큰)를 그대로 저장한다.
+  /// 이미 Slack 이 발급한 유효한 토큰이므로 auth.test 를 다시 부르지 않는다.
+  Future<void> connectWithOAuth(SlackOAuthResult result) async {
+    botToken = result.botToken;
+    teamName = result.teamName;
     await _secure.write(key: 'slack_botToken', value: botToken);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('slack_teamName', teamName);

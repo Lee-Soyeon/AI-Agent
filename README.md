@@ -8,6 +8,7 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
     보낸 메일로 **내 말투를 학습**해 인사말·호칭·어미·서명까지 내가 쓴 것처럼 답장합니다.
 - **나머지는 에이전트가 알아서 처리합니다.** 상품 검색, 장바구니 담기, 메일 요약, 답장 작성 등.
 - **업무 필터 → Slack**: 에이닷(통화 요약)이나 문자에서 "공유" 버튼으로 보낸 내용을 LLM 이 업무 관련인지 판단해, 업무 관련인 것만 Slack 채널로 전달합니다.
+  "Slack 워크스페이스 연동" 버튼 한 번으로 끝나는 OAuth 방식([slack_relay/](slack_relay/README.md), 배포용)과 직접 Bot Token을 입력하는 방식을 모두 지원합니다.
   설정은 [docs/work-filter-slack-setup.md](docs/work-filter-slack-setup.md) 참고 (iOS 는 Share Extension 추가가 한 번 필요합니다).
 - **결제와 메일 전송은 반드시 사용자 승인 후에만 합니다.** 이 규칙은 프롬프트뿐 아니라 코드에서도 강제됩니다.
 - **대화는 버리지 않고 남습니다.** **채팅** 탭에서 지난 작업을 다시 열어 로그·결과를 보고 그대로 이어서 지시할 수 있습니다.
@@ -64,6 +65,7 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
 
 ```
 server/                           # 서버 모드 (Python · FastAPI · Playwright) — server/README.md
+slack_relay/                      # Slack OAuth 중계 서버 (Cloudflare Worker, 배포자가 1곳에만 배포) — slack_relay/README.md
 lib/
 ├── main.dart                     # Provider 구성, 앱 시작
 ├── llm/                          # LLM 공급자 추상화 (도구 호출 지원)
@@ -96,6 +98,7 @@ lib/
 │   └── agent_server_client.dart  # 서버 REST 클라이언트
 ├── slack/
 │   ├── slack_api.dart             # Slack Web API (Bot Token): auth.test, conversations.list, chat.postMessage
+│   ├── slack_oauth_service.dart   # "Slack 워크스페이스 연동" 버튼 (slack_relay/ 중계 서버 이용, Client Secret 불필요)
 │   └── slack_store.dart           # Slack 연결 상태(토큰·채널) 저장
 ├── workfilter/                    # 업무 필터 → Slack (docs/work-filter-slack-setup.md)
 │   ├── work_filter_models.dart    #   공유 항목 모델(SharedItem), 분류 결과
