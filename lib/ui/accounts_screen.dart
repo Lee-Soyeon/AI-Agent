@@ -116,7 +116,6 @@ class _ServerBrowserCard extends StatelessWidget {
   const _ServerBrowserCard();
 
   static const _presets = {
-    '쿠팡': 'https://login.coupang.com/login/login.pang',
     '네이버': 'https://nid.naver.com/nidlogin.login',
     'Gmail': 'https://accounts.google.com/ServiceLogin?service=mail',
     '코레일': 'https://www.korail.com/ticket/login',

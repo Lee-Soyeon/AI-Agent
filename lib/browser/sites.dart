@@ -57,7 +57,8 @@ const coupang = SiteConfig(
 
 /// 웹 자동화(인앱 브라우저 로그인 + 헤드리스 웹뷰)로 다루는 사이트.
 /// Gmail 은 웹 자동화 대신 Google 로그인 + Gmail API 를 쓴다 (lib/google/).
-const allSites = [coupang];
+/// 사용자에게 보이는 폰 모드 사이트 목록. 2026-10-21 대표 결정으로 쿠팡 제거 (설정 상수는 테스트용으로만 남김).
+const allSites = <SiteConfig>[];
 
 SiteConfig? siteById(String id) {
   for (final s in allSites) {

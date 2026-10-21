@@ -237,24 +237,13 @@ class _SkeletonChips extends StatelessWidget {
   }
 }
 
-/// 갤러리 카드 = before/after 그림(없으면 회색 자리) + 제목 + 한 줄 (PRD 4.3).
+/// 레시피 카드 = 제목 + 할 수 있는 것 한 줄.
 class GalleryCard extends StatelessWidget {
   const GalleryCard({super.key, required this.recipe, required this.onTap, this.large = false});
 
   final Recipe recipe;
   final VoidCallback onTap;
   final bool large;
-
-  Widget _pane(BuildContext context, String? asset, String label) {
-    final t = AppTokens.of(context);
-    Widget placeholder = Container(
-      color: t.line,
-      alignment: Alignment.center,
-      child: Text(label, style: TextStyle(color: t.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-    );
-    if (asset == null) return placeholder;
-    return Image.asset(asset, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -272,18 +261,8 @@ class GalleryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: large ? 140 : 88,
-              child: Row(
-                children: [
-                  Expanded(child: _pane(context, recipe.galleryBefore, '전')),
-                  Container(width: 1, color: t.lineStrong),
-                  Expanded(child: _pane(context, recipe.galleryAfter, '후')),
-                ],
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

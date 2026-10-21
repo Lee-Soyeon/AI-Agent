@@ -34,7 +34,7 @@ TOOLS = [
              "결제수단)를 모두 준비한 결제 직전 화면에서 호출하라. 사용자가 요약을 확인하고 같은 화면에서 직접 결제"
              "(결제 비밀번호·카드 인증 포함)를 마친다. 결제가 끝나면 완료 페이지 스냅샷이 돌아온다.",
              {"type": "object", "properties": {
-                 "title": {"type": "string", "description": '예: "쿠팡 결제: 코카콜라 제로 24캔"'},
+                 "title": {"type": "string", "description": '예: "결제: 생수 2L 12개"'},
                  "summary": {"type": "string", "description": "상품·옵션·수량·단가·총 결제금액·배송지·결제수단"},
                  "details": {"type": "string"},
              }, "required": ["title", "summary"]}),
@@ -51,7 +51,7 @@ TOOLS = [
              "한국 주요 서비스의 시작·로그인·검색 URL 과 사용 팁을 알려준다. 처음 쓰는 서비스는 먼저 호출하라. "
              "keyword 를 주면 그 서비스의 검색 결과 URL 도 만들어 준다.",
              {"type": "object", "properties": {
-                 "service": {"type": "string", "description": "서비스 이름 (예: 쿠팡, 네이버 지도, 코레일)"},
+                 "service": {"type": "string", "description": "서비스 이름 (예: 네이버 지도, 코레일)"},
                  "keyword": {"type": "string", "description": "검색어 (선택)"},
              }, "required": ["service"]}),
     ToolSpec("show_ui",
