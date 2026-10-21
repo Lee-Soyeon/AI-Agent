@@ -56,3 +56,4 @@ server/.env
 # python venv
 server/.venv/
 server/data/
+.vercel
