@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
+import '../core/settings_store.dart';
 import 'app_theme.dart';
 import 'accounts_screen.dart';
 import 'chat_list_screen.dart';
 import 'guide_screen.dart';
+import 'onboarding_screen.dart';
 import 'settings_screen.dart';
 
 enum AppTab {
@@ -42,6 +44,7 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tab = context.watch<ShellTabs>().tab;
+    if (!context.watch<SettingsStore>().onboardingDone) return const OnboardingScreen();
     return Scaffold(
       // 본문이 탭 바 뒤까지 이어지고, 탭 바 높이만큼 MediaQuery 아래 여백이 생긴다.
       extendBody: true,
@@ -70,7 +73,7 @@ class FloatingTabBar extends StatelessWidget {
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return const SizedBox.shrink();
     final tabs = context.watch<ShellTabs>();
     final agent = context.watch<AgentController>();
-    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
+    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null || agent.pendingUi != null;
     final t = AppTokens.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final desktop = width >= _desktop;

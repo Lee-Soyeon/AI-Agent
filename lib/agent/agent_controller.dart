@@ -15,6 +15,7 @@ import '../google/writing_style.dart';
 import '../llm/llm_types.dart';
 import '../remote/agent_server_client.dart';
 import '../services/service_catalog.dart';
+import '../ui_parts/ui_part.dart';
 import '../ui/browser_screen.dart';
 import '../ui/payment_screen.dart';
 import '../ui/remote_browser_screen.dart';
@@ -75,6 +76,9 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   Uint8List? lastScreenshot;
   ApprovalRequest? pendingApproval;
   UserQuestion? pendingQuestion;
+
+  /// 서버가 show_ui 로 묻는 중인 부품 (chips·keyword·file_button·confirm). 답은 [answerQuestion].
+  UiPart? pendingUi;
   String? helpReason;
 
   bool get isBusy =>
@@ -159,6 +163,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
     lastScreenshot = null;
     pendingApproval = null;
     pendingQuestion = null;
+    pendingUi = null;
     _remoteShotVersion = 0;
     _lastPollError = null;
     notifyListeners();
@@ -233,6 +238,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
         gmailAccount: google.email,
         styleGuide: writingStyle.profile?.guide,
         serviceIndex: catalog?.promptIndex(),
+        userProfile: settings.profileSummary,
       ),
       history: history,
     );
@@ -290,6 +296,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       _remoteCall(() => _server!.cancel(_remoteTaskId!));
       pendingApproval = null;
       pendingQuestion = null;
+      pendingUi = null;
       notifyListeners();
       return;
     }
@@ -332,6 +339,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   void answerQuestion(String answer) {
     if (isRemote) {
       pendingQuestion = null;
+      pendingUi = null;
       notifyListeners();
       _remoteCall(() => _server!.answer(_remoteTaskId!, answer));
       return;
@@ -602,6 +610,13 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       }
     } else {
       pendingQuestion = null;
+    }
+    if (type == 'ui') {
+      final raw = p!['ui'];
+      final encoded = jsonEncode(raw);
+      if (pendingUi == null || jsonEncode(pendingUi!.toJson()) != encoded) pendingUi = UiPart.fromJson(raw);
+    } else {
+      pendingUi = null;
     }
     if (type == 'help' && !_helpOpen) _openRemoteHelp('${p!['reason'] ?? '직접 처리해 주세요.'}');
   }

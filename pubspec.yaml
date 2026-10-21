@@ -43,6 +43,9 @@ dependencies:
   url_launcher: ^6.3.2
   web_socket_channel: ^3.0.3
   path_provider: ^2.1.5
+  file_picker: ^13.1.0
+  image_picker: ^1.2.4
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +72,8 @@ flutter:
   # 한국 주요 서비스 카탈로그 — 서버(server/app)와 같은 파일을 쓴다.
   assets:
     - server/app/services.json
+    - server/app/tasks.json
+    - server/app/ui_schema.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:

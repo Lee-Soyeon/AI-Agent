@@ -5,6 +5,7 @@ import '../core/settings_store.dart';
 import '../llm/model_list.dart';
 import '../remote/agent_server_client.dart';
 import 'chatgpt_login.dart';
+import 'onboarding_screen.dart';
 import 'app_theme.dart';
 import 'main_shell.dart';
 
@@ -157,42 +158,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final t = AppTokens.of(context);
+    final settings = context.watch<SettingsStore>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('모델 설정'),
+        title: const Text('설정'),
         actions: [TextButton(onPressed: _save, child: const Text('저장'))],
       ),
       body: ListView(
         padding: tabListPadding(context),
         children: [
-          Text('실행 위치', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, icon: Icon(Icons.phone_iphone), label: Text('이 폰')),
-              ButtonSegment(value: true, icon: Icon(Icons.cloud), label: Text('서버 (백그라운드)')),
-            ],
-            selected: {_runOnServer},
-            onSelectionChanged: (v) => setState(() => _runOnServer = v.first),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _runOnServer
-                ? '작업이 서버의 크롬 브라우저에서 실행됩니다. 앱을 꺼도 계속되고, 어떤 웹 서비스든 다룰 수 있습니다. '
-                      'LLM 은 서버에 설정한 API 키를 씁니다. (server/README.md 참고)'
-                : '작업이 이 폰의 보이지 않는 브라우저와 Gmail API 로 실행됩니다. 앱을 내리면 멈출 수 있습니다.',
-            style: Theme.of(context).textTheme.bodySmall,
+          // ---- 기본 경로: 계정 없이 시작 (서버가 운영자 키로 실행) ----
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('계정 없이 시작 (서버)', style: TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: const Text('API 키 없이 서버가 대신 실행해요. 앱을 꺼도 계속돼요.'),
+            value: _runOnServer,
+            onChanged: (v) => setState(() => _runOnServer = v),
           ),
           if (_runOnServer) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             TextField(
               controller: _serverUrl,
               keyboardType: TextInputType.url,
               autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: '서버 주소',
-                hintText: 'https://agent.example.com',
-              ),
+              decoration: const InputDecoration(labelText: '서버 주소', hintText: 'https://agent.example.com'),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -200,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(labelText: '서버 토큰 (AGENT_TOKEN)'),
+              decoration: const InputDecoration(labelText: '서버 토큰'),
             ),
             const SizedBox(height: 8),
             Row(
@@ -214,99 +205,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: Text(
                       _serverTest!,
-                      style: TextStyle(
-                        color: _serverOk
-                            ? AppTokens.of(context).accent
-                            : AppTokens.of(context).errorInk,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: _serverOk ? t.accent : t.errorInk, fontWeight: FontWeight.w600),
                     ),
                   ),
               ],
             ),
           ],
-          const Divider(height: 40),
-          Text(
-            _runOnServer ? '이 폰에서 쓸 LLM (말투 학습 등)' : '사용할 LLM',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          const Divider(height: 32),
+          Text('ChatGPT 로 로그인', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text('ChatGPT Plus·Pro 구독이 있으면 이 폰에서 바로 실행할 수 있어요.', style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final v in LlmVendor.values)
-                ChoiceChip(
-                  label: Text(v.label),
-                  selected: _vendor == v,
-                  onSelected: (_) => setState(() => _vendor = v),
-                ),
-            ],
+          const ChatGptAccountTile(),
+          const Divider(height: 32),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.person_outline),
+            title: const Text('프로필 다시 설정'),
+            subtitle: Text(settings.profileSummary ?? '아직 설정 전'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OnboardingScreen())),
           ),
-          const SizedBox(height: 24),
-          for (final v in LlmVendor.values) ...[
-            Text(v.label, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            if (!v.usesApiKey)
-              const ChatGptAccountTile()
-            else
-              TextField(
-                controller: _keys[v],
-                obscureText: !_revealed.contains(v),
-                autocorrect: false,
-                enableSuggestions: false,
-                decoration: InputDecoration(
-                  labelText: 'API 키',
-                  suffixIcon: IconButton(
-                    icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(
-                      () => _revealed.contains(v) ? _revealed.remove(v) : _revealed.add(v),
+          const Divider(height: 32),
+          // ---- 고급: API 키·모델·단계 수 (일반 사용자 경로에서 숨김, PRD 8) ----
+          Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text('고급', style: theme.textTheme.titleMedium),
+              subtitle: const Text('API 키 · 모델 · 최대 단계 수'),
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  _runOnServer ? '이 폰에서 쓸 LLM (말투 학습 등)' : '사용할 LLM',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final v in LlmVendor.values)
+                      ChoiceChip(
+                        label: Text(v.label),
+                        selected: _vendor == v,
+                        onSelected: (_) => setState(() => _vendor = v),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                for (final v in LlmVendor.values) ...[
+                  Text(v.label, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  if (!v.usesApiKey)
+                    const ChatGptAccountTile()
+                  else
+                    TextField(
+                      controller: _keys[v],
+                      obscureText: !_revealed.contains(v),
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: InputDecoration(
+                        labelText: 'API 키',
+                        suffixIcon: IconButton(
+                          icon: Icon(_revealed.contains(v) ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(
+                            () => _revealed.contains(v) ? _revealed.remove(v) : _revealed.add(v),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _models[v],
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      labelText: '모델',
+                      helperText: '기본값: ${v.defaultModel}',
+                      suffixIcon: v.usesApiKey
+                          ? IconButton(
+                              tooltip: '사용 가능한 모델 목록',
+                              icon: const Icon(Icons.format_list_bulleted),
+                              onPressed: () => _pickModel(v),
+                            )
+                          : null,
                     ),
                   ),
+                  if (v == LlmVendor.anthropic) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _workspaceId,
+                      autocorrect: false,
+                      decoration: const InputDecoration(
+                        labelText: '워크스페이스 ID (선택)',
+                        helperText: '"not scoped to a workspace" 오류가 날 때만 입력 (wrkspc_…)',
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                ],
+                TextField(
+                  controller: _maxSteps,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '작업당 최대 단계 수',
+                    helperText: '에이전트가 무한히 돌지 않도록 제한합니다',
+                  ),
                 ),
-              ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _models[v],
-              autocorrect: false,
-              decoration: InputDecoration(
-                labelText: '모델',
-                helperText: '기본값: ${v.defaultModel}',
-                suffixIcon: v.usesApiKey
-                    ? IconButton(
-                        tooltip: '사용 가능한 모델 목록',
-                        icon: const Icon(Icons.format_list_bulleted),
-                        onPressed: () => _pickModel(v),
-                      )
-                    : null,
-              ),
-            ),
-            if (v == LlmVendor.anthropic) ...[
-              const SizedBox(height: 8),
-              TextField(
-                controller: _workspaceId,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: '워크스페이스 ID (선택)',
-                  helperText: '"not scoped to a workspace" 오류가 날 때만 입력 (wrkspc_…)',
+                const SizedBox(height: 16),
+                Text(
+                  'API 키는 기기의 보안 저장소(iOS Keychain / Android Keystore)에만 저장되며, '
+                  '각 LLM 공급자에게 직접 전송됩니다. 사이트 비밀번호는 앱이 저장하지 않습니다.',
+                  style: theme.textTheme.bodySmall,
                 ),
-              ),
-            ],
-            const SizedBox(height: 24),
-          ],
-          TextField(
-            controller: _maxSteps,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: '작업당 최대 단계 수',
-              helperText: '에이전트가 무한히 돌지 않도록 제한합니다',
+                const SizedBox(height: 8),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'API 키는 기기의 보안 저장소(iOS Keychain / Android Keystore)에만 저장되며, '
-            '각 LLM 공급자에게 직접 전송됩니다. 사이트 비밀번호는 앱이 저장하지 않습니다.',
-            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),

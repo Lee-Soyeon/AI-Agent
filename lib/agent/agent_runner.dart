@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import '../browser/agent_browser.dart';
 import '../google/gmail_api.dart';
@@ -6,6 +7,7 @@ import '../google/writing_style.dart';
 import '../services/service_catalog.dart';
 import '../llm/llm_types.dart';
 import 'agent_models.dart';
+import '../ui_parts/ui_part.dart';
 import 'agent_tools.dart';
 import 'safety.dart';
 
@@ -331,6 +333,23 @@ class AgentRunner {
           hooks.onLog(AgentLogEntry(LogKind.user, answer));
           return _Outcome('사용자 답변: $answer');
 
+        case AgentTools.showUi:
+          final part = UiPart.fromJson(a['ui']);
+          if (!part.interactive) {
+            hooks.onLog(AgentLogEntry(LogKind.ui, part.question ?? part.caption ?? '화면', detail: jsonEncode(part.toJson())));
+            return _Outcome(part.fallbackReason == null ? '표시했습니다.' : '부품이 잘못되어 글로 표시했습니다 (${part.fallbackReason}).');
+          }
+          // 이 폰에서 실행할 때는 선택지 카드로 묻는다 (서버 모드는 서버가 pending ui 로 보낸다).
+          final q = UserQuestion(
+            part.question ?? part.title,
+            choices: part.type == UiPartType.confirm ? [part.sentence] : part.options,
+          );
+          hooks.onStatus(AgentStatus.waitingUser);
+          final answer = await hooks.askUser(q);
+          hooks.onStatus(AgentStatus.running);
+          hooks.onLog(AgentLogEntry(LogKind.user, answer));
+          return _Outcome('사용자 답변: $answer');
+
         case AgentTools.requestUserHelp:
           final reason = '${a['reason'] ?? '직접 처리해 주세요.'}';
           final before = await browser.currentUrl();
@@ -506,27 +525,37 @@ class AgentRunner {
     return _Outcome('오류: $msg');
   }
 
+  /// 로그 한 줄. 도구 이름·이모지 없이 사용자 언어로 (PRD 5.4).
   static String _describeCall(ToolCall c) {
     final a = c.arguments;
+    String host(Object? u) {
+      final h = Uri.tryParse('$u')?.host ?? '';
+      return h.isEmpty ? '$u' : h.replaceFirst(RegExp(r'^(m|www)\.'), '');
+    }
     return switch (c.name) {
-      AgentTools.openUrl => '🌐 열기: ${a['url']}',
-      AgentTools.readPage => '👀 페이지 읽기',
-      AgentTools.click => '👆 클릭 #${a['element_id']}',
-      AgentTools.typeText =>
-        '⌨️ 입력 #${a['element_id']}: "${a['text']}"${a['submit'] == true ? ' ⏎' : ''}',
-      AgentTools.scroll => '↕️ 스크롤 ${a['direction']}',
-      AgentTools.goBack => '⬅️ 뒤로',
-      AgentTools.requestApproval => '🙋 승인 요청: ${a['title']}',
-      AgentTools.askUser => '❓ 질문: ${a['question']}',
-      AgentTools.requestUserHelp => '🧑 사용자 도움 요청: ${a['reason']}',
-      AgentTools.finish => '🏁 완료',
-      AgentTools.serviceInfo => '📇 서비스 정보: ${a['service']}',
-      AgentTools.handoffPayment => '💳 결제 넘기기: ${a['title']}',
-      AgentTools.gmailSearch => '📬 메일 검색: ${a['query']}',
-      AgentTools.gmailRead => '📖 메일 읽기',
-      AgentTools.gmailSend => '✉️ 메일 전송 준비: ${a['subject']}',
-      AgentTools.gmailStyleExamples => '🖋️ 내 말투 확인: ${a['recipient'] ?? '최근 메일'}',
-      _ => '${c.name} $a',
+      AgentTools.openUrl => '${host(a['url'])} 열기',
+      AgentTools.readPage => '페이지 읽기',
+      AgentTools.click => '누르기',
+      AgentTools.typeText => '"${a['text']}" 입력${a['submit'] == true ? ' 후 확인' : ''}',
+      AgentTools.scroll => switch (a['direction']) {
+        'up' => '위로 올리기',
+        'top' => '맨 위로',
+        'bottom' => '맨 아래로',
+        _ => '아래로 내리기',
+      },
+      AgentTools.goBack => '뒤로 가기',
+      AgentTools.requestApproval => '승인 요청: ${a['title']}',
+      AgentTools.askUser => '질문: ${a['question']}',
+      AgentTools.showUi => '화면 보여주기',
+      AgentTools.requestUserHelp => '직접 해주세요: ${a['reason']}',
+      AgentTools.finish => '완료',
+      AgentTools.serviceInfo => '${a['service']} 사용법 확인',
+      AgentTools.handoffPayment => '결제 넘기기: ${a['title']}',
+      AgentTools.gmailSearch => '메일 찾기: ${a['query']}',
+      AgentTools.gmailRead => '메일 읽기',
+      AgentTools.gmailSend => '메일 보내기 준비: ${a['subject']}',
+      AgentTools.gmailStyleExamples => '내 말투 확인: ${a['recipient'] ?? '최근 메일'}',
+      _ => c.name,
     };
   }
 }

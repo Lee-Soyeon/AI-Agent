@@ -7,8 +7,10 @@ import '../agent/agent_models.dart';
 import '../core/settings_store.dart';
 import 'app_theme.dart';
 import 'browser_pip.dart';
-import 'guide_screen.dart' show taskExamples;
+import '../recipes/recipe_catalog.dart';
+import '../ui_parts/ui_part.dart';
 import 'main_shell.dart';
+import 'ui_renderer.dart';
 
 /// 새 채팅을 열고 작업 화면으로 간다. [draft] 가 있으면 입력창에 미리 채운다.
 void openNewChat(BuildContext context, {String? draft}) {
@@ -154,6 +156,17 @@ class _TaskScreenState extends State<TaskScreen> {
             _ApprovalCard(agent: agent, request: agent.pendingApproval!),
           if (agent.pendingQuestion != null)
             _QuestionCard(agent: agent, question: agent.pendingQuestion!),
+          if (agent.pendingUi != null && agent.pendingQuestion == null)
+            SafeArea(
+              top: false,
+              child: Card(
+                margin: const EdgeInsets.all(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: UiPartView(part: agent.pendingUi!, onAnswer: agent.answerQuestion),
+                ),
+              ),
+            ),
           if (!agent.isBusy && !fresh && !agent.hasConversation)
             SafeArea(
               top: false,
@@ -229,7 +242,21 @@ class _LogTile extends StatelessWidget {
       LogKind.approval => (Icons.verified_user, AppTokens.of(context).warningInk),
       LogKind.error => (Icons.error_outline, scheme.error),
       LogKind.result => (Icons.flag, scheme.primary),
+      LogKind.ui => (Icons.dashboard_customize_outlined, scheme.primary),
     };
+
+    if (entry.kind == LogKind.ui && entry.detail != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: UiPartView(part: UiPart.decode(entry.detail!), compact: true),
+          ),
+        ),
+      );
+    }
 
     final body = entry.kind == LogKind.result || entry.kind == LogKind.user
         ? Card(
@@ -463,26 +490,31 @@ class _NewChatHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final catalog = context.read<RecipeCatalog?>();
+    final recipes = catalog?.recipes ?? const <Recipe>[];
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text('무엇을 해드릴까요?', style: theme.textTheme.titleLarge),
         const SizedBox(height: 4),
         Text(
-          '할 일을 적으면 에이전트가 백그라운드에서 처리합니다. 결제·메일 전송은 승인 후에만 해요.',
+          '할 일을 한 줄로 적어 주세요. 결제·메일 전송은 승인 후에만 해요.',
           style: TextStyle(color: AppTokens.of(context).muted, fontSize: 13.5, height: 1.5),
         ),
-        const SizedBox(height: 16),
-        Text('예시', style: theme.textTheme.labelLarge),
-        const SizedBox(height: 4),
-        for (final e in taskExamples)
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.lightbulb_outline, size: 20),
-            title: Text(e),
-            onTap: () => onPick(e),
-          ),
+        if (recipes.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('이런 것도 돼요', style: theme.textTheme.labelLarge),
+          const SizedBox(height: 4),
+          for (final r in recipes)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.lightbulb_outline, size: 20),
+              title: Text(r.title),
+              subtitle: Text(r.can, maxLines: 1, overflow: TextOverflow.ellipsis),
+              onTap: () => onPick(r.title),
+            ),
+        ],
       ],
     );
   }
@@ -497,7 +529,7 @@ class ActiveTaskBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null;
+    final needsYou = agent.pendingApproval != null || agent.pendingQuestion != null || agent.pendingUi != null;
     return Card(
       color: needsYou ? t.warningBg : t.accentSoft,
       child: ListTile(

@@ -52,6 +52,21 @@ class SettingsStore extends ChangeNotifier {
   String serverUrl = '';
   String serverToken = '';
 
+  // ---- 사용자 프로필 (첫 실행 3문답, PRD 5.1) ----
+  /// tasks.json personas 의 id (student | office | parttime | owner | home | jobseeker | other).
+  String persona = '';
+
+  /// 요즘 반복하는 일 (tasks.json routines[persona] 중 하나 또는 직접 입력).
+  String routine = '';
+
+  /// phone | computer
+  String device = '';
+  bool onboardingDone = false;
+
+  /// 웹 빌드에 --dart-define 으로 박아 둔 서버 주소·토큰 (가족 검증용).
+  static const webServerUrl = String.fromEnvironment('AGENT_SERVER_URL');
+  static const webServerToken = String.fromEnvironment('AGENT_SERVER_TOKEN');
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     vendor = LlmVendor.values.firstWhere(
@@ -67,6 +82,16 @@ class SettingsStore extends ChangeNotifier {
     } catch (_) {
       serverToken = '';
     }
+    // 웹: 사용자가 직접 저장한 서버 설정이 없으면 빌드에 박힌 값을 쓴다.
+    if (kIsWeb && webServerUrl.isNotEmpty && serverUrl.isEmpty) {
+      runOnServer = true;
+      serverUrl = webServerUrl;
+      serverToken = webServerToken;
+    }
+    persona = prefs.getString('profile_persona') ?? '';
+    routine = prefs.getString('profile_routine') ?? '';
+    device = prefs.getString('profile_device') ?? '';
+    onboardingDone = prefs.getBool('onboardingDone') ?? false;
     for (final v in LlmVendor.values) {
       final saved = prefs.getString('model_${v.name}');
       // 예전 기본값이 저장돼 있고 그 모델이 없어졌다면 새 기본값으로 바꾼다.
@@ -94,6 +119,34 @@ class SettingsStore extends ChangeNotifier {
 
   AgentServerClient? get serverClient =>
       isServerConfigured ? AgentServerClient(baseUrl: serverUrl, token: serverToken) : null;
+
+  Future<void> saveProfile({
+    required String persona,
+    required String routine,
+    required String device,
+    bool done = true,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    this.persona = persona;
+    this.routine = routine;
+    this.device = device;
+    onboardingDone = done;
+    await prefs.setString('profile_persona', persona);
+    await prefs.setString('profile_routine', routine);
+    await prefs.setString('profile_device', device);
+    await prefs.setBool('onboardingDone', done);
+    notifyListeners();
+  }
+
+  /// 시스템 프롬프트에 넣을 프로필 한 줄. 아무것도 없으면 null.
+  String? get profileSummary {
+    final parts = [
+      if (persona.isNotEmpty) '하는 일: $persona',
+      if (routine.isNotEmpty) '반복하는 일: $routine',
+      if (device.isNotEmpty) '주로 쓰는 기기: ${device == 'computer' ? '컴퓨터' : '폰'}',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
 
   Future<void> saveServer({
     required bool runOnServer,
