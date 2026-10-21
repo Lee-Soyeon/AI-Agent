@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "doc": "show_ui 부품 8종. LLM 은 이 안에서만 화면을 조립한다. 앱(ui_renderer.dart)과 서버(ui_schema.py)가 같은 파일로 검증한다. interactive=true 인 부품은 사용자의 답을 기다린다.",
+  "parts": {
+    "chips": {
+      "interactive": true,
+      "required": ["question", "options"],
+      "optional": ["why", "allow_free", "placeholder"],
+      "doc": "질문 한 줄 + 칩 2~6개. 탭하면 바로 답이 된다. allow_free 면 '직접 입력' 칩이 붙는다."
+    },
+    "keyword": {
+      "interactive": true,
+      "required": ["question"],
+      "optional": ["why", "placeholder", "options"],
+      "doc": "질문 한 줄 + 한 줄 입력창. placeholder 에 예시를 쓴다. options 가 있으면 입력창 위에 칩으로 보인다."
+    },
+    "file_button": {
+      "interactive": true,
+      "required": ["question", "label"],
+      "optional": ["why", "accept"],
+      "doc": "큰 버튼 하나. accept 는 file | photo | text."
+    },
+    "confirm": {
+      "interactive": true,
+      "required": ["sentence"],
+      "optional": ["title"],
+      "doc": "조립된 문장 + '이렇게 시킬까요?' + 실행·고치기·복사. 답은 최종 문장."
+    },
+    "table": {
+      "interactive": false,
+      "required": ["headers", "rows"],
+      "optional": ["caption"],
+      "doc": "headers: 문자열 배열, rows: 문자열 배열의 배열. 20행 이상이면 앞 20행만."
+    },
+    "before_after": {
+      "interactive": false,
+      "required": ["before", "after"],
+      "optional": ["caption"],
+      "doc": "before/after 는 텍스트 또는 이미지 URL(data:image 포함)."
+    },
+    "checklist": {
+      "interactive": false,
+      "required": ["items"],
+      "optional": ["done", "caption"],
+      "doc": "items: 문자열 배열, done: 같은 길이의 불리언 배열."
+    },
+    "text_block": {
+      "interactive": false,
+      "required": ["text"],
+      "optional": ["caption"],
+      "doc": "그 외 전부. 검증 실패 시 이 부품으로 떨어뜨린다."
+    }
+  },
+  "limits": {
+    "chips_min": 2,
+    "chips_max": 6,
+    "table_rows_max": 20,
+    "checklist_items_max": 12,
+    "text_max_chars": 2000
+  }
+}

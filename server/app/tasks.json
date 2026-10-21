@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "updated": "2026-10-21",
+  "doc": "레시피 카탈로그. 앱(asset)과 서버가 같은 파일을 쓴다. steps 는 최대 3개. kind: file | photo | text | chips | keyword. options_from 은 앞 단계 입력에서 뽑은 값(file.headers 등). prompt_template 의 {id} 는 steps 의 id 또는 입력 내용 자리표시자({file}, {photo}, {text}).",
+  "personas": [
+    {"id": "student", "label": "학생"},
+    {"id": "office", "label": "직장인"},
+    {"id": "parttime", "label": "아르바이트"},
+    {"id": "owner", "label": "자영업"},
+    {"id": "home", "label": "은퇴·가정"},
+    {"id": "jobseeker", "label": "취업 준비"},
+    {"id": "other", "label": "기타"}
+  ],
+  "routines": {
+    "student": ["과제 요약", "발표 자료", "영어 공부", "없음"],
+    "office": ["엑셀 정리", "메일 답장", "회의록", "없음"],
+    "parttime": ["엑셀 정리", "재고 사진 정리", "근무표", "없음"],
+    "owner": ["재고 정리", "안내문 쓰기", "리뷰 답글", "없음"],
+    "home": ["성경 공부", "모임 안내문", "사진 정리", "없음"],
+    "jobseeker": ["자기소개서", "채용 공고 확인", "면접 준비", "없음"],
+    "other": ["글 다듬기", "사진 정리", "표 정리", "없음"]
+  },
+  "intake_defaults": {
+    "photo": ["사진 속 글자를 표로 옮기기", "사진 속 글을 쉽게 풀기", "사진 설명 쓰기"],
+    "file": ["빈 열 채우기", "내용 요약", "중복 찾기"],
+    "text": ["쉽게 풀기", "고치기", "요약"]
+  },
+  "recipes": [
+    {
+      "id": "bible_plain",
+      "title": "성경 구절 쉽게 풀기",
+      "can": "구절을 쉬운 말로 풀고 핵심 한 줄을 덧붙임",
+      "cannot": "교리 해석의 옳고 그름은 판단하지 않음",
+      "personas": ["home"],
+      "inputs": ["photo", "text"],
+      "engine": "llm",
+      "steps": [
+        {"id": "source", "kind": "text", "text": "구절을 붙여 넣거나 사진으로 찍어 주세요", "button": "사진 찍기", "placeholder": "예: 시편 23편 1절"},
+        {"id": "level", "kind": "chips", "why": "누가 읽을지 알아야 말의 높이를 맞춰요", "text": "누가 읽나요?", "options": ["나 혼자", "아이들", "모임 사람들"], "allow_free": true}
+      ],
+      "prompt_template": "다음 성경 구절을 {level}이(가) 읽기 쉬운 말로 풀어줘. 원문은 그대로 두고 아래에 쉬운 말 풀이를 쓰고, 마지막에 핵심을 한 줄로 적어줘. 구절: {source}",
+      "next": "bible_questions",
+      "gallery": {"before": "assets/gallery/bible_before.png", "after": "assets/gallery/bible_after.png", "line": "원문 → 쉬운 말"}
+    },
+    {
+      "id": "bible_questions",
+      "title": "묵상 질문 만들기",
+      "can": "구절로 묵상 질문 3개를 만듦",
+      "cannot": "답을 대신 쓰지 않음",
+      "personas": ["home"],
+      "inputs": ["photo", "text"],
+      "engine": "llm",
+      "steps": [
+        {"id": "source", "kind": "text", "text": "구절을 붙여 넣거나 사진으로 찍어 주세요", "button": "사진 찍기", "placeholder": "예: 요한복음 3장 16절"},
+        {"id": "count", "kind": "chips", "text": "질문은 몇 개?", "options": ["3개", "5개"], "allow_free": false}
+      ],
+      "prompt_template": "다음 성경 구절로 묵상 질문 {count}를 만들어줘. 각 질문은 한 줄이고, 일상에서 떠올릴 수 있는 질문으로. 구절: {source}",
+      "next": null,
+      "gallery": {"before": "assets/gallery/bibleq_before.png", "after": "assets/gallery/bibleq_after.png", "line": "구절 → 질문 3개"}
+    },
+    {
+      "id": "notice_write",
+      "title": "모임 안내문 쓰기",
+      "can": "날짜·장소·준비물로 안내문을 씀",
+      "cannot": "보내지는 않음",
+      "personas": ["home", "owner"],
+      "inputs": ["text"],
+      "engine": "llm",
+      "steps": [
+        {"id": "what", "kind": "keyword", "text": "무슨 모임인가요?", "placeholder": "예: 수요 성경공부", "options": ["성경공부", "식사 모임", "봉사"]},
+        {"id": "when", "kind": "keyword", "text": "언제 어디서?", "placeholder": "예: 10월 25일 저녁 7시 교회 2층"},
+        {"id": "tone", "kind": "chips", "why": "받는 분들에 맞춰 말투를 정해요", "text": "말투는?", "options": ["정중하게", "친근하게"], "allow_free": false}
+      ],
+      "prompt_template": "{what} 안내문을 {tone} 써줘. 일시와 장소: {when}. 5문장 이내로, 준비물이 있으면 마지막 줄에.",
+      "next": null,
+      "gallery": {"before": "assets/gallery/notice_before.png", "after": "assets/gallery/notice_after.png", "line": "메모 → 안내문"}
+    },
+    {
+      "id": "excel_fill",
+      "title": "엑셀 빈 열 채우기",
+      "can": "다른 열을 보고 비어 있는 열을 채움",
+      "cannot": "수식·매크로·서식은 못 바꿈",
+      "personas": ["parttime", "office", "owner"],
+      "inputs": ["file"],
+      "engine": "llm",
+      "steps": [
+        {"id": "file", "kind": "file", "text": "채울 엑셀을 올려주세요", "button": "엑셀 올리기", "accept": "file"},
+        {"id": "column", "kind": "chips", "why": "같은 형식으로 채우려면 머리글이 필요해요", "text": "어느 열을 채울까요?", "options_from": "file.headers", "allow_free": true},
+        {"id": "values", "kind": "keyword", "text": "들어갈 값의 종류는?", "placeholder": "예: 식품·생활·전자", "options": ["파일에 있는 것 그대로"]}
+      ],
+      "prompt_template": "첨부한 엑셀의 다른 열을 보고 '{column}' 열을 채워줘. 값은 {values} 중 하나. 확신이 없는 행은 비워 두고 맨 아래에 목록으로 알려줘. 결과는 show_ui 의 table 로 보여줘. 파일 내용: {file}",
+      "next": "excel_summary",
+      "gallery": {"before": "assets/gallery/excel_before.png", "after": "assets/gallery/excel_after.png", "line": "빈 열 → 채워진 열"}
+    },
+    {
+      "id": "photo_to_table",
+      "title": "사진 속 글자 표로 옮기기",
+      "can": "영수증·재고표·명단 사진을 표로 옮김",
+      "cannot": "흐린 사진은 못 읽을 수 있음",
+      "personas": ["parttime", "owner", "office"],
+      "inputs": ["photo"],
+      "engine": "llm",
+      "steps": [
+        {"id": "photo", "kind": "photo", "text": "사진을 찍거나 골라 주세요", "button": "사진 찍기", "accept": "photo"},
+        {"id": "columns", "kind": "chips", "text": "어떤 표로 만들까요?", "options": ["사진에 있는 그대로", "품목·수량·금액", "이름·연락처"], "allow_free": true}
+      ],
+      "prompt_template": "첨부한 사진의 글자를 읽어서 표로 옮겨줘. 열 구성: {columns}. 못 읽은 칸은 '?'로 두고, 결과는 show_ui 의 table 로 보여줘.",
+      "next": "excel_summary",
+      "gallery": {"before": "assets/gallery/photo_before.png", "after": "assets/gallery/photo_after.png", "line": "사진 → 표"}
+    },
+    {
+      "id": "shift_table",
+      "title": "근무표 정리",
+      "can": "메모로 적은 근무를 주간 표로 정리",
+      "cannot": "급여 계산은 하지 않음",
+      "personas": ["parttime", "owner"],
+      "inputs": ["text", "photo"],
+      "engine": "llm",
+      "steps": [
+        {"id": "source", "kind": "text", "text": "근무 메모를 붙여 넣어 주세요", "placeholder": "예: 월 9-3 민수, 화 2-8 지연 …", "button": "사진 찍기"},
+        {"id": "unit", "kind": "chips", "text": "어떻게 묶을까요?", "options": ["요일별", "사람별"], "allow_free": false}
+      ],
+      "prompt_template": "다음 근무 메모를 {unit} 표로 정리해줘. 겹치거나 비는 시간이 있으면 표 아래에 한 줄로 알려줘. 결과는 show_ui 의 table 로. 메모: {source}",
+      "next": null,
+      "gallery": {"before": "assets/gallery/shift_before.png", "after": "assets/gallery/shift_after.png", "line": "메모 → 근무표"}
+    },
+    {
+      "id": "resume_fix",
+      "title": "자기소개서 고치기",
+      "can": "문장을 다듬고 빠진 근거를 물어봄",
+      "cannot": "없는 경험을 지어내지 않음",
+      "personas": ["jobseeker", "student"],
+      "inputs": ["text", "file"],
+      "engine": "llm",
+      "steps": [
+        {"id": "source", "kind": "text", "text": "자기소개서를 붙여 넣어 주세요", "placeholder": "문항과 답을 그대로"},
+        {"id": "goal", "kind": "chips", "why": "무엇을 바꿀지 정해야 과하게 고치지 않아요", "text": "무엇을 고칠까요?", "options": ["문장만 다듬기", "분량 줄이기", "근거 보강 질문"], "allow_free": true}
+      ],
+      "prompt_template": "다음 자기소개서를 '{goal}' 방향으로만 고쳐줘. 없는 경험은 절대 추가하지 말고, 바꾼 부분은 show_ui 의 before_after 로 보여줘. 글: {source}",
+      "next": "job_summary",
+      "gallery": {"before": "assets/gallery/resume_before.png", "after": "assets/gallery/resume_after.png", "line": "초안 → 다듬은 글"}
+    },
+    {
+      "id": "job_summary",
+      "title": "채용 공고 요약",
+      "can": "공고 링크나 글에서 자격·마감·우대를 뽑음",
+      "cannot": "지원서를 대신 내지 않음",
+      "personas": ["jobseeker"],
+      "inputs": ["text"],
+      "engine": "browser",
+      "steps": [
+        {"id": "source", "kind": "keyword", "text": "공고 링크나 글을 붙여 넣어 주세요", "placeholder": "https:// 또는 공고 본문"}
+      ],
+      "prompt_template": "다음 채용 공고를 읽고 자격 요건·마감일·우대 사항·근무지를 show_ui 의 checklist 로 정리해줘. 링크면 열어서 읽어. 공고: {source}",
+      "next": "resume_fix",
+      "gallery": {"before": "assets/gallery/job_before.png", "after": "assets/gallery/job_after.png", "line": "공고 → 체크리스트"}
+    },
+    {
+      "id": "coupang_cheapest",
+      "title": "쿠팡 최저가 찾기",
+      "can": "검색해서 로켓배송 중 제일 싼 것을 장바구니까지",
+      "cannot": "결제는 직접 하셔야 함",
+      "personas": ["parttime", "office", "home", "student", "owner", "jobseeker", "other"],
+      "inputs": [],
+      "engine": "browser",
+      "steps": [
+        {"id": "item", "kind": "keyword", "text": "무엇을 찾을까요?", "placeholder": "예: 삼다수 2L 12개"},
+        {"id": "delivery", "kind": "chips", "text": "배송은?", "options": ["로켓배송만", "상관없음"], "allow_free": false}
+      ],
+      "prompt_template": "쿠팡에서 '{item}'을 검색해서 {delivery} 조건으로 제일 싼 상품을 찾아 장바구니에 담아줘. 결제 전에 handoff_payment 로 나에게 넘겨줘.",
+      "next": null,
+      "gallery": {"before": "assets/gallery/coupang_before.png", "after": "assets/gallery/coupang_after.png", "line": "검색 → 장바구니"}
+    },
+    {
+      "id": "excel_summary",
+      "title": "표 내용 요약",
+      "can": "표를 읽고 합계·눈에 띄는 것 3줄",
+      "cannot": "원본을 바꾸지 않음",
+      "personas": ["parttime", "office", "owner", "other"],
+      "inputs": ["file", "photo"],
+      "engine": "llm",
+      "steps": [
+        {"id": "file", "kind": "file", "text": "표 파일을 올려주세요", "button": "파일 올리기", "accept": "file"}
+      ],
+      "prompt_template": "첨부한 표를 읽고 합계와 눈에 띄는 점을 3줄로 요약해줘. 결과는 show_ui 의 checklist 로. 파일 내용: {file}",
+      "next": null,
+      "gallery": {"before": "assets/gallery/summary_before.png", "after": "assets/gallery/summary_after.png", "line": "표 → 3줄 요약"}
+    }
+  ]
+}
