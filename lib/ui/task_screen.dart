@@ -208,7 +208,7 @@ class _TaskScreenState extends State<TaskScreen> {
                         minLines: 1,
                         maxLines: fresh ? 6 : 4,
                         decoration: InputDecoration(
-                          hintText: fresh ? '예) 쿠팡에서 휴지 30롤 담아줘' : '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
+                          hintText: fresh ? '예) 이 근무 메모를 요일별 표로 정리해줘' : '이어서 지시하기 (예: 두 번째 메일에 답장 써줘)',
                           isDense: true,
                         ),
                       ),

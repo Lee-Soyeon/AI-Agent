@@ -101,7 +101,7 @@ class AgentTools {
             'type': 'string',
             'enum': ['purchase', 'send_email', 'other'],
           },
-          'title': {'type': 'string', 'description': '한 줄 제목 (예: "쿠팡 결제 승인 요청")'},
+          'title': {'type': 'string', 'description': '한 줄 제목 (예: "결제 승인 요청")'},
           'summary': {'type': 'string', 'description': '핵심 요약 (여러 줄 가능)'},
           'details': {'type': 'string', 'description': '이메일 본문 전체, 상품 목록 등 상세 내용'},
         },
@@ -117,7 +117,7 @@ class AgentTools {
       parameters: {
         'type': 'object',
         'properties': {
-          'title': {'type': 'string', 'description': '예: "쿠팡 결제: 코카콜라 제로 24캔"'},
+          'title': {'type': 'string', 'description': '예: "결제: 생수 2L 12개"'},
           'summary': {'type': 'string', 'description': '상품·옵션·수량·단가·총 결제금액·배송지·결제수단 (여러 줄)'},
           'details': {'type': 'string', 'description': '추가 정보 (쿠폰·배송 예정일 등, 선택)'},
         },
@@ -227,7 +227,7 @@ class AgentTools {
       parameters: {
         'type': 'object',
         'properties': {
-          'service': {'type': 'string', 'description': '서비스 이름 (예: 쿠팡, 네이버 지도, 코레일)'},
+          'service': {'type': 'string', 'description': '서비스 이름 (예: 네이버 지도, 코레일)'},
           'keyword': {'type': 'string', 'description': '검색어 (선택)'},
         },
         'required': ['service'],

@@ -21,7 +21,7 @@ def test_invariants_hold_for_every_recipe():
             if s["kind"] == "chips":
                 assert s.get("options") or s.get("options_from"), (r["id"], s["id"])
         assert r["engine"] in ("llm", "browser", "gmail")
-        assert r["gallery"]["before"] and r["gallery"]["after"] and r["gallery"]["line"]
+        assert "gallery" not in r  # 2026-10-21 전후 그림 제거
 
 
 def test_persona_ordering_puts_matches_first():
