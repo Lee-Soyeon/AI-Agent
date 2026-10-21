@@ -54,6 +54,18 @@ TOOLS = [
                  "service": {"type": "string", "description": "서비스 이름 (예: 쿠팡, 네이버 지도, 코레일)"},
                  "keyword": {"type": "string", "description": "검색어 (선택)"},
              }, "required": ["service"]}),
+    ToolSpec("show_ui",
+             "사용자에게 화면 부품을 보여준다. 긴 글 대신 이것을 쓴다. 부품 8종: "
+             "chips(question, options 2~6개, allow_free) · keyword(question, placeholder, options) · "
+             "file_button(question, label, accept=file|photo|text) · confirm(sentence, title) · "
+             "table(headers, rows, caption) · before_after(before, after, caption) · checklist(items, done, caption) · "
+             "text_block(text). chips·keyword·file_button·confirm 은 사용자의 답을 기다렸다가 그 답을 돌려준다. "
+             "table·before_after·checklist·text_block 은 결과 표시용이며 바로 돌아온다. "
+             "결과물(표·고친 글·정리 목록)은 반드시 table·before_after·checklist 로 보여주고 finish 로 짧게 마무리한다. "
+             "ask_user 는 show_ui chips 와 같다.",
+             {"type": "object", "properties": {
+                 "ui": {"type": "object", "description": '예: {"type":"chips","question":"어느 열?","options":["품목","단가"]}'},
+             }, "required": ["ui"]}),
     ToolSpec("finish", "작업을 마치고 한국어로 결과를 보고한다.",
              {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}),
 ]

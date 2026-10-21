@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import json
 import logging
 import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from . import catalog
+from . import catalog, ui_schema
 from .browser import BrowserError
 from .llm import LlmProvider, Message, ToolCall, complete_with_retry
 from .safety import SafetyPolicy
@@ -31,6 +32,18 @@ def system_prompt(now: dt.datetime | None = None) -> str:
 
 ## 지원 서비스 (상세 URL·팁은 service_info 도구로 확인)
 {catalog.prompt_index()}
+
+## 화면 부품 show_ui
+- 사용자에게 보여줄 것은 긴 글 대신 show_ui 로 그립니다. 부품은 아래 8종뿐이며 다른 형식(HTML·마크다운 표)은 쓰지 않습니다.
+{ui_schema.prompt_help()}
+- chips·keyword·file_button·confirm 은 사용자의 답을 돌려줍니다. 질문은 한 작업에 3개 이내, 한 번에 하나씩, 칩으로 답할 수 있게.
+- ask_user 는 show_ui chips 와 같습니다.
+- 결과물(표·고친 글·정리 목록)은 table·before_after·checklist 로 보여준 뒤 finish 로 한두 문장만 보고합니다.
+
+## 파일·사진·글 작업
+- 사용자 메시지에 파일 내용(표 텍스트)·사진·글이 들어 있으면 브라우저를 열지 말고 그 내용만으로 처리합니다.
+- 표는 show_ui table 로, 고친 글은 before_after 로, 요약·정리는 checklist 로 보여줍니다.
+- 없는 내용을 지어내지 않습니다. 못 읽은 칸은 "?" 로 둡니다.
 
 ## 작업 방식
 1. 필요한 사이트를 open_url 로 열고, 스냅샷의 요소 id 로 click / type_text 하세요. id 는 스냅샷마다 바뀝니다.
@@ -306,7 +319,7 @@ class AgentRunner:
 
     async def _execute(self, task: Task, call: ToolCall) -> tuple[str, str | None]:
         a = call.arguments
-        task.log("action", _describe(call))
+        task.log("action", await self._describe(call))
         try:
             match call.name:
                 case "open_url":
@@ -372,11 +385,11 @@ class AgentRunner:
                     decision = await task.wait_for("approval", data, "waiting_approval") or {}
                     if decision.get("approved"):
                         self.safety.grant()
-                        task.log("approval", f"✅ 사용자가 승인했습니다: {data['title']}")
+                        task.log("approval", f"사용자가 승인했습니다: {data['title']}")
                         return "승인됨. 해당 버튼을 10분 안에 한 번 누를 수 있습니다. 승인받은 내용과 다르게 진행하지 마세요.", None
                     self.safety.revoke()
                     fb = (decision.get("feedback") or "").strip()
-                    task.log("approval", "❌ 사용자가 거절했습니다" + (f": {fb}" if fb else ""))
+                    task.log("approval", "사용자가 거절했습니다" + (f": {fb}" if fb else ""))
                     return (
                         f'거절됨. 사용자 의견: "{fb}". 반영해서 다시 request_approval 하세요.'
                         if fb
@@ -395,19 +408,28 @@ class AgentRunner:
                         watcher.cancel()
                     fb = (out.get("feedback") or "").strip()
                     if not out.get("approved"):
-                        task.log("approval", "❌ 결제를 거절했습니다" + (f": {fb}" if fb else ""))
+                        task.log("approval", "결제를 거절했습니다" + (f": {fb}" if fb else ""))
                         return (
                             f'사용자가 결제 전에 수정을 요청했습니다: "{fb}". 반영한 뒤 다시 handoff_payment 하세요.'
                             if fb
                             else "사용자가 결제를 거절했습니다. 결제하지 말고 finish 로 보고하세요."
                         ), None
                     if out.get("completed"):
-                        task.log("approval", "✅ 사용자가 결제를 마쳤습니다" + (" (완료 페이지 자동 감지)" if out.get("auto") else ""))
+                        task.log("approval", "사용자가 결제를 마쳤습니다" + (" (완료 페이지 자동 감지)" if out.get("auto") else ""))
                         return await self._observe(task, "사용자가 결제를 마쳤습니다. 이 페이지에서 주문번호·결제금액을 확인해 finish 로 보고하세요.")
                     task.log("approval", "결제 화면을 닫았습니다 (결제 미완료)")
                     return await self._observe(
                         task, "사용자가 결제를 마치지 않고 화면을 닫았습니다. 다시 시도할지 ask_user 로 묻거나 finish 로 보고하세요."
                     )
+                case "show_ui":
+                    tree = ui_schema.coerce(a.get("ui"))
+                    if ui_schema.is_interactive(tree):
+                        answer = await task.wait_for("ui", {"ui": tree}, "waiting_user")
+                        answer = str(answer or "(답변 없음)")
+                        task.log("user", answer)
+                        return f"사용자 답: {answer}", None
+                    task.log("ui", ui_schema.label(tree), json.dumps(tree, ensure_ascii=False))
+                    return "표시했습니다.", None
                 case "ask_user":
                     data = {"question": str(a.get("question", "")), "choices": [str(c) for c in a.get("choices") or []]}
                     answer = await task.wait_for("question", data, "waiting_user")
@@ -438,19 +460,51 @@ class AgentRunner:
             return self._error(task, f"도구 실행 중 오류: {e}")
 
 
+    async def _describe(self, c: ToolCall) -> str:
+        """로그 한 줄. 사용자 언어로, 도구 이름과 요소 번호는 보이지 않게."""
+        a = c.arguments
+        if c.name in ("click", "type_text"):
+            label = ""
+            eid = _as_int(a.get("element_id"))
+            if eid is not None:
+                try:
+                    d = await self.browser.describe(eid)
+                    label = str(d.get("label") or "") if d.get("ok") else ""
+                except Exception:  # noqa: BLE001
+                    label = ""
+            if c.name == "click":
+                return f"{label} 누르기" if label else "버튼 누르기"
+            text = str(a.get("text", ""))
+            short = text[:20] + ("…" if len(text) > 20 else "")
+            return f"입력: {short}" + (" 후 엔터" if a.get("submit") else "")
+        return _describe(c)
+
+
+def _domain(url: Any) -> str:
+    m = re.match(r"https?://([^/?#]+)", str(url or ""))
+    host = (m.group(1) if m else str(url or "")).removeprefix("www.").removeprefix("m.")
+    return host or "페이지"
+
+
 def _describe(c: ToolCall) -> str:
+    """브라우저 조회가 필요 없는 도구의 로그 한 줄."""
     a = c.arguments
+    if c.name == "show_ui":
+        ui = a.get("ui") if isinstance(a.get("ui"), dict) else {}
+        return f"질문: {ui.get('question', '')}" if ui.get("type") in ("chips", "keyword", "file_button") else "화면 표시"
     return {
-        "open_url": f"🌐 열기: {a.get('url')}",
-        "read_page": "👀 페이지 읽기",
-        "click": f"👆 클릭 #{a.get('element_id')}",
-        "type_text": f"⌨️ 입력 #{a.get('element_id')}: \"{a.get('text')}\"" + (" ⏎" if a.get("submit") else ""),
-        "scroll": f"↕️ 스크롤 {a.get('direction')}",
-        "go_back": "⬅️ 뒤로",
-        "request_approval": f"🙋 승인 요청: {a.get('title')}",
-        "ask_user": f"❓ 질문: {a.get('question')}",
-        "request_user_help": f"🧑 사용자 도움 요청: {a.get('reason')}",
-        "finish": "🏁 완료",
-        "service_info": f"📇 서비스 정보: {a.get('service')}",
-        "handoff_payment": f"💳 결제 넘기기: {a.get('title')}",
-    }.get(c.name, f"{c.name} {a}")
+        "open_url": f"{_domain(a.get('url'))} 열기",
+        "read_page": "페이지 읽기",
+        "click": "버튼 누르기",
+        "type_text": "입력",
+        "scroll": {"down": "아래로 내리기", "up": "위로 올리기", "top": "맨 위로", "bottom": "맨 아래로"}.get(
+            str(a.get("direction", "down")), "스크롤"
+        ),
+        "go_back": "뒤로 가기",
+        "request_approval": f"승인 요청: {a.get('title')}",
+        "ask_user": f"질문: {a.get('question')}",
+        "request_user_help": "직접 처리 요청",
+        "finish": "완료",
+        "service_info": f"{a.get('service')} 정보 확인",
+        "handoff_payment": f"결제 넘기기: {a.get('title')}",
+    }.get(c.name, c.name)

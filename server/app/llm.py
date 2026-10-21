@@ -33,6 +33,8 @@ class Message:
     tool_call_id: str | None = None
     tool_name: str | None = None
     raw: Any = None  # 공급자 원본 (Claude 블록, Gemini parts) — 다음 요청에 그대로 되돌려 보냄
+    # 사용자 메시지에 붙는 이미지: [{"mime": "image/jpeg", "data": "<base64>"}]. 기록에는 저장하지 않는다.
+    images: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -104,7 +106,13 @@ class OpenAiProvider:
         out: list[dict[str, Any]] = [{"role": "system", "content": system}]
         for m in messages:
             if m.role == "user":
-                out.append({"role": "user", "content": m.text or ""})
+                if m.images:
+                    content: list[dict[str, Any]] = [{"type": "text", "text": m.text or ""}]
+                    for im in m.images:
+                        content.append({"type": "image_url", "image_url": {"url": f"data:{im['mime']};base64,{im['data']}"}})
+                    out.append({"role": "user", "content": content})
+                else:
+                    out.append({"role": "user", "content": m.text or ""})
             elif m.role == "assistant":
                 msg: dict[str, Any] = {"role": "assistant", "content": m.text}
                 if m.tool_calls:
@@ -170,11 +178,15 @@ class AnthropicProvider:
         out: list[dict[str, Any]] = []
         for m in messages:
             if m.role == "user":
-                block = {"type": "text", "text": m.text or ""}
+                blocks: list[dict[str, Any]] = [
+                    {"type": "image", "source": {"type": "base64", "media_type": im["mime"], "data": im["data"]}}
+                    for im in m.images
+                ]
+                blocks.append({"type": "text", "text": m.text or ""})
                 if out and out[-1]["role"] == "user":
-                    out[-1]["content"].append(block)
+                    out[-1]["content"].extend(blocks)
                 else:
-                    out.append({"role": "user", "content": [block]})
+                    out.append({"role": "user", "content": blocks})
             elif m.role == "assistant":
                 content = m.raw if isinstance(m.raw, list) else [
                     *([{"type": "text", "text": m.text}] if m.text else []),
@@ -229,11 +241,14 @@ class GeminiProvider:
         contents: list[dict[str, Any]] = []
         for m in messages:
             if m.role == "user":
-                part = {"text": m.text or ""}
+                parts_u: list[dict[str, Any]] = [
+                    {"inlineData": {"mimeType": im["mime"], "data": im["data"]}} for im in m.images
+                ]
+                parts_u.append({"text": m.text or ""})
                 if contents and contents[-1]["role"] == "user":
-                    contents[-1]["parts"].append(part)
+                    contents[-1]["parts"].extend(parts_u)
                 else:
-                    contents.append({"role": "user", "parts": [part]})
+                    contents.append({"role": "user", "parts": parts_u})
             elif m.role == "assistant":
                 parts = m.raw if isinstance(m.raw, list) else [
                     *([{"text": m.text}] if m.text else []),
