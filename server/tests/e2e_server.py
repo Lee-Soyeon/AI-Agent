@@ -4,6 +4,8 @@
 """
 
 import sys
+import tempfile
+from pathlib import Path
 
 import uvicorn
 
@@ -20,7 +22,9 @@ llm = ScriptedLlm([
     call("finish", {"summary": "주문 완료"}, "e"),
     LlmResponse(text="후속 답변"),
 ])
-app = create_app(Settings(agent_token="e2e-token"), browser=FakeBrowser(), llm=llm)
+app = create_app(
+    Settings(agent_token="e2e-token", data_dir=Path(tempfile.mkdtemp())), browser=FakeBrowser(), llm=llm
+)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]), log_level="warning")

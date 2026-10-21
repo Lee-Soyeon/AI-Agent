@@ -20,6 +20,7 @@ from .agent import AgentRunner, Task
 from .browser import BrowserManager, Screencast
 from .config import Settings
 from .llm import LlmProvider, create_provider
+from .store import TaskStore
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,11 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     settings.validate()
-    state: dict[str, Any] = {"tasks": {}, "current": None}
+    store = TaskStore(settings.data_dir / "tasks")
+    tasks = store.load_all()
+    for t in tasks.values():
+        store.watch(t)
+    state: dict[str, Any] = {"tasks": tasks, "current": None}
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -79,6 +84,7 @@ def create_app(
         yield
         for t in state["tasks"].values():
             t.cancel()
+        store.flush(state["tasks"])
         if browser is None:
             await state["browser"].stop()
 
@@ -121,9 +127,15 @@ def create_app(
             raise HTTPException(409, "이미 진행 중인 작업이 있습니다. 끝나거나 취소한 뒤 시도하세요.")
         task = Task(body.prompt.strip())
         state["tasks"][task.id] = task
+        store.watch(task)
         state["current"] = task
         launch(task, task.prompt)
         return task.to_json()
+
+    @app.get("/tasks", dependencies=[Depends(auth)])
+    async def list_tasks() -> list[dict[str, Any]]:
+        """지난 작업(대화) 목록, 최근에 바뀐 순."""
+        return sorted((t.summary() for t in state["tasks"].values()), key=lambda t: t["updated_at"], reverse=True)
 
     @app.get("/tasks/current", dependencies=[Depends(auth)])
     async def current_task() -> dict[str, Any] | None:
@@ -170,6 +182,18 @@ def create_app(
     @app.post("/tasks/{task_id}/cancel", dependencies=[Depends(auth)])
     async def cancel(task_id: str) -> dict[str, Any]:
         get_task(task_id).cancel()
+        return {"ok": True}
+
+    @app.delete("/tasks/{task_id}", dependencies=[Depends(auth)])
+    async def delete_task(task_id: str) -> dict[str, Any]:
+        task = get_task(task_id)
+        if busy() and state["current"] is task:
+            raise HTTPException(409, "진행 중인 작업은 삭제할 수 없습니다. 먼저 취소하세요.")
+        del state["tasks"][task_id]
+        task.listeners.clear()
+        if state["current"] is task:
+            state["current"] = None
+        store.delete(task_id)
         return {"ok": True}
 
     @app.get("/tasks/{task_id}/screenshot", dependencies=[Depends(auth)])
