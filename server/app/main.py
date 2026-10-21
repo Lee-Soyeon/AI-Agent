@@ -12,15 +12,17 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from . import catalog
+from . import catalog, intake, recipes
 from .agent import AgentRunner, Task
 from .browser import BrowserManager, Screencast
 from .config import Settings
 from .llm import LlmProvider, create_provider
 from .store import TaskStore
+from .usage import LIMIT_MESSAGE, MeteredLlm, UsageMeter
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +50,14 @@ class OpenIn(BaseModel):
     url: str
 
 
+class IntakeIn(BaseModel):
+    kind: str  # photo | file | text
+    name: str | None = None
+    text: str | None = None
+    image_base64: str | None = None
+    mime: str | None = None
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -60,7 +70,13 @@ def create_app(
     tasks = store.load_all()
     for t in tasks.values():
         store.watch(t)
-    state: dict[str, Any] = {"tasks": tasks, "current": None}
+    meter = UsageMeter(
+        settings.data_dir / "usage.json",
+        daily_limit=settings.daily_request_limit,
+        monthly_limit=settings.monthly_request_limit,
+    )
+    state: dict[str, Any] = {"tasks": tasks, "current": None, "meter": meter}
+    recipes.data()  # 카탈로그가 깨져 있으면 여기서 바로 실패한다
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -71,7 +87,7 @@ def create_app(
             state["browser"] = b
         else:
             state["browser"] = browser
-        state["llm"] = llm or create_provider(
+        inner = llm or create_provider(
             settings.llm_provider,
             settings.llm_model,
             anthropic_key=settings.anthropic_api_key,
@@ -81,6 +97,7 @@ def create_app(
             xai_key=settings.xai_api_key,
             openrouter_key=settings.openrouter_api_key,
         )
+        state["llm"] = MeteredLlm(inner, meter)
         yield
         for t in state["tasks"].values():
             t.cancel()
@@ -89,6 +106,13 @@ def create_app(
             await state["browser"].stop()
 
     app = FastAPI(title="AI Agent Server", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     def check_token(token: str | None) -> None:
         if settings.allow_no_auth and not settings.agent_token:
@@ -109,6 +133,10 @@ def create_app(
         cur: Task | None = state["current"]
         return bool(cur and cur.status in ("running", "waiting_approval", "waiting_user"))
 
+    def check_limit() -> None:
+        if meter.exceeded():
+            raise HTTPException(429, LIMIT_MESSAGE)
+
     def launch(task: Task, message: str) -> None:
         runner = AgentRunner(state["llm"], state["browser"], max_steps=settings.max_steps)
         task.runner = asyncio.create_task(runner.run(task, message))
@@ -121,10 +149,30 @@ def create_app(
     async def health() -> dict[str, Any]:
         return {"ok": True}
 
+    @app.get("/recipes", dependencies=[Depends(auth)])
+    async def list_recipes() -> dict[str, Any]:
+        """레시피 카탈로그 전체 (tasks.json). 앱은 asset 으로도 갖고 있지만 서버 쪽이 최신이다."""
+        return recipes.data()
+
+    @app.get("/usage", dependencies=[Depends(auth)])
+    async def usage() -> dict[str, Any]:
+        return meter.to_json()
+
+    @app.post("/intake", dependencies=[Depends(auth)])
+    async def intake_suggest(body: IntakeIn) -> dict[str, Any]:
+        """내 것부터 넣기: 올린 내용으로 할 수 있는 일 3개를 칩으로 돌려준다."""
+        if body.kind not in intake.KINDS:
+            raise HTTPException(400, "kind 는 photo | file | text 중 하나입니다.")
+        check_limit()
+        return await intake.suggest(
+            state["llm"], kind=body.kind, name=body.name, text=body.text, image_base64=body.image_base64, mime=body.mime
+        )
+
     @app.post("/tasks", dependencies=[Depends(auth)])
     async def create_task(body: TaskIn) -> dict[str, Any]:
         if busy():
             raise HTTPException(409, "이미 진행 중인 작업이 있습니다. 끝나거나 취소한 뒤 시도하세요.")
+        check_limit()
         task = Task(body.prompt.strip())
         state["tasks"][task.id] = task
         store.watch(task)
@@ -160,7 +208,9 @@ def create_app(
 
     @app.post("/tasks/{task_id}/answer", dependencies=[Depends(auth)])
     async def answer(task_id: str, body: AnswerIn) -> dict[str, Any]:
-        if not get_task(task_id).resolve("question", body.text):
+        task = get_task(task_id)
+        # show_ui(칩·키워드·파일·확인) 답과 ask_user 답을 같은 창구로 받는다
+        if not (task.resolve("ui", body.text) or task.resolve("question", body.text)):
             raise HTTPException(409, "질문을 기다리는 중이 아닙니다.")
         return {"ok": True}
 
@@ -175,6 +225,7 @@ def create_app(
         task = get_task(task_id)
         if busy():
             raise HTTPException(409, "이미 진행 중인 작업이 있습니다.")
+        check_limit()
         state["current"] = task
         launch(task, body.prompt.strip())
         return task.to_json()

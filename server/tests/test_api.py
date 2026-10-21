@@ -7,7 +7,7 @@ from app.config import Settings
 from app.llm import LlmResponse
 from app.main import create_app
 
-from .fakes import FakeBrowser, ScriptedLlm, call
+from .fakes import FakeBrowser, ScriptedLlm, call, last_tool_result
 
 AUTH = {"Authorization": "Bearer secret"}
 
@@ -178,3 +178,54 @@ def test_payment_endpoint():
         r = c.post(f"/tasks/{t['id']}/payment", json={"approved": True, "completed": True}, headers=AUTH)
         assert r.json() == {"ok": True}
         assert wait(c, t["id"], lambda d: d["status"] == "finished")["result"] == "주문 완료"
+
+
+def test_show_ui_waits_for_answer_then_logs_result_parts():
+    llm = ScriptedLlm([
+        call("show_ui", {"ui": {"type": "chips", "question": "어느 열을 채울까요?", "options": ["품목", "카테고리"]}}, "a"),
+        call("show_ui", {"ui": {"type": "table", "headers": ["품목", "카테고리"], "rows": [["물", "식품"], ["세제", "생활"]]}}, "b"),
+        call("show_ui", {"ui": {"type": "html", "html": "<b>x</b>"}}, "c"),
+        call("finish", {"summary": "채웠어요"}, "d"),
+    ])
+    with TestClient(make(llm)) as c:
+        t = c.post("/tasks", json={"prompt": "엑셀 채워줘"}, headers=AUTH).json()
+        data = wait(c, t["id"], lambda d: d["status"] == "waiting_user")
+        assert data["pending"]["type"] == "ui"
+        assert data["pending"]["ui"] == {"type": "chips", "question": "어느 열을 채울까요?", "options": ["품목", "카테고리"], "allow_free": True}
+        assert data["logs"][-1]["text"] == "질문: 어느 열을 채울까요?"
+        # 같은 /answer 창구로 답한다
+        assert c.post(f"/tasks/{t['id']}/answer", json={"text": "카테고리"}, headers=AUTH).json() == {"ok": True}
+        data = wait(c, t["id"], lambda d: d["status"] == "finished")
+        assert data["result"] == "채웠어요"
+        assert "사용자 답: 카테고리" in last_tool_result(llm.seen[1])
+        ui_logs = [l for l in data["logs"] if l["kind"] == "ui"]
+        assert [l["text"] for l in ui_logs] == ["표 2행", "글"]
+        import json as _json
+        assert _json.loads(ui_logs[0]["detail"])["rows"] == [["물", "식품"], ["세제", "생활"]]
+        assert _json.loads(ui_logs[1]["detail"])["type"] == "text_block"  # 허용되지 않은 부품은 글로 떨어진다
+
+
+def test_recipes_endpoint_and_cors():
+    with TestClient(make(ScriptedLlm([]))) as c:
+        assert c.get("/recipes").status_code == 401
+        body = c.get("/recipes", headers=AUTH).json()
+        assert any(r["id"] == "excel_fill" for r in body["recipes"]) and body["personas"]
+        r = c.get("/health", headers={"Origin": "https://example.vercel.app"})
+        assert r.headers.get("access-control-allow-origin") == "*"
+
+
+def test_action_logs_are_korean_without_tool_names():
+    llm = ScriptedLlm([
+        call("open_url", {"url": "https://www.coupang.com/np/search?q=x"}, "a"),
+        call("click", {"element_id": 1}, "b"),
+        call("type_text", {"element_id": 1, "text": "삼다수 2L 12개 로켓배송 제일 싼 것", "submit": True}, "c"),
+        call("scroll", {"direction": "down"}, "d"),
+        call("finish", {"summary": "끝"}, "e"),
+    ])
+    with TestClient(make(llm)) as c:
+        t = c.post("/tasks", json={"prompt": "x"}, headers=AUTH).json()
+        data = wait(c, t["id"], lambda d: d["status"] == "finished")
+        actions = [l["text"] for l in data["logs"] if l["kind"] == "action"]
+        assert actions == ["coupang.com 열기", "장바구니 담기 누르기", "입력: 삼다수 2L 12개 로켓배송 제일 싼… 후 엔터", "아래로 내리기", "완료"]
+        for a in actions:
+            assert "open_url" not in a and "#" not in a

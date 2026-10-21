@@ -69,3 +69,18 @@ async def test_grok_and_openrouter_use_openai_format_with_their_urls():
     assert str(seen[1].url) == "https://openrouter.ai/api/v1/chat/completions"
     assert seen[1].headers["x-title"] == "AI Agent"
     assert b'"model":"openrouter/free"' in seen[1].content.replace(b" ", b"")
+
+
+def test_images_are_sent_to_all_three_providers():
+    from app.llm import AnthropicProvider, GeminiProvider, OpenAiProvider
+
+    m = [Message(role="user", text="이 사진", images=[{"mime": "image/png", "data": "QUJD"}])]
+    o = OpenAiProvider.build_body("gpt", "s", m, [])["messages"][1]["content"]
+    assert o[0] == {"type": "text", "text": "이 사진"} and o[1]["image_url"]["url"] == "data:image/png;base64,QUJD"
+    a = AnthropicProvider.build_body("c", 10, "s", m, [])["messages"][0]["content"]
+    assert a[0]["source"] == {"type": "base64", "media_type": "image/png", "data": "QUJD"} and a[1]["text"] == "이 사진"
+    g = GeminiProvider.build_body("s", m, [])["contents"][0]["parts"]
+    assert g[0] == {"inlineData": {"mimeType": "image/png", "data": "QUJD"}} and g[1] == {"text": "이 사진"}
+    # 이미지가 없으면 예전과 같은 형식
+    plain = [Message(role="user", text="x")]
+    assert OpenAiProvider.build_body("gpt", "s", plain, [])["messages"][1]["content"] == "x"

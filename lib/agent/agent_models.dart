@@ -2,7 +2,8 @@ import 'dart:async';
 
 enum AgentStatus { idle, running, waitingApproval, waitingUser, finished, failed, cancelled }
 
-enum LogKind { user, thought, action, observation, approval, error, result }
+/// ui: show_ui 부품 (detail 에 JSON 부품 트리).
+enum LogKind { user, thought, action, observation, approval, error, result, ui }
 
 class AgentLogEntry {
   AgentLogEntry(this.kind, this.text, {this.detail, DateTime? time})

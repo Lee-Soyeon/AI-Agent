@@ -1,44 +1,69 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
-import '../browser/session_store.dart';
-import '../browser/sites.dart';
+import '../agent/intake_content.dart';
 import '../core/settings_store.dart';
-import '../google/google_auth.dart';
-import '../openai/chatgpt_auth.dart';
+import '../recipes/recipe_catalog.dart';
+import '../remote/agent_server_client.dart';
+import '../ui_parts/ui_part.dart';
 import 'app_theme.dart';
-import 'main_shell.dart';
+import 'confirm_screen.dart';
+import 'intake_picker.dart';
+import 'main_shell.dart' show tabListPadding;
+import 'step_screen.dart';
 import 'task_screen.dart';
+import 'toss_form.dart';
+import 'ui_renderer.dart';
 
-const taskExamples = [
-  '쿠팡에서 삼다수 2L 12개 로켓배송 제일 싼 걸 장바구니에 담고, 결제 전에 나한테 승인 받아줘',
-  '쿠팡 장바구니에 뭐가 들어있는지 알려줘',
-  'Gmail 에서 안 읽은 메일 5개 요약해줘',
-  'Gmail 에서 가장 최근 메일에 "확인했습니다, 감사합니다" 라고 답장 써서 승인 받고 보내줘',
-  '안 읽은 메일 중 답장이 필요한 것에 평소 내 말투로 답장 초안 써줘',
-  '이번 주 토요일 저녁 7시 강남역 근처 4인 파스타집 네이버 예약 가능한 곳 찾아줘',
-  '다음 주 금요일 서울→부산 KTX 오후 6시 이후 좌석 있는지 봐줘',
-  '오늘 CGV 용산 저녁 상영시간표 알려줘',
-  'G마켓·11번가·쿠팡에서 에어팟 프로 최저가 비교해줘',
-];
-
-/// 홈 탭: 앱 사용법 안내. 각 단계의 준비 상태를 보여주고 해당 탭으로 보내 준다.
-class GuideScreen extends StatelessWidget {
+/// 홈 탭 (PRD 4.3, 5.2). 묻지 않는다. 보여준다.
+///
+/// 위에서 아래로: 오늘의 하나 · 내 것부터 넣기(사진·파일·글) · 이런 것도 돼요(갤러리) · 다른 일이 있어요(접힘).
+class GuideScreen extends StatefulWidget {
   const GuideScreen({super.key});
+
+  @override
+  State<GuideScreen> createState() => _GuideScreenState();
+}
+
+class _GuideScreenState extends State<GuideScreen> {
+  final _other = TextEditingController();
+
+  @override
+  void dispose() {
+    _other.dispose();
+    super.dispose();
+  }
+
+  Future<void> _intake(String accept) async {
+    final content = await pickIntakeContent(context, accept);
+    if (content == null || !mounted) return;
+    await showIntakeChips(context, content);
+  }
+
+  Future<void> _startOther(String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    if (!await ConfirmScreen.ensureReady(context)) return;
+    if (!mounted) return;
+    final agent = context.read<AgentController>();
+    if (agent.isBusy) return;
+    _other.clear();
+    agent.startTask(t);
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaskScreen()));
+  }
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsStore>();
-    final sessions = context.watch<SiteSessionStore>();
-    final google = context.watch<GoogleAuthService>();
     final agent = context.watch<AgentController>();
-    context.watch<ChatGptAuth>(); // ChatGPT 로그인 상태가 바뀌면 준비 상태를 갱신
-    final tabs = context.read<ShellTabs>();
+    final catalog = context.read<RecipeCatalog?>() ?? RecipeCatalog.empty();
     final theme = Theme.of(context);
     final t = AppTokens.of(context);
-
-    final loggedIn = settings.runOnServer || google.isSignedIn || allSites.any(sessions.isLoggedIn);
+    final today = catalog.todays();
+    final recipes = catalog.forPersona(settings.persona);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI Agent')),
@@ -46,173 +71,240 @@ class GuideScreen extends StatelessWidget {
         padding: tabListPadding(context),
         children: [
           if (agent.isBusy) ActiveTaskBanner(agent: agent),
-          // activity-timeblock page.module.css .title — 24px / 700 / -0.03em
+          if (today != null) ...[
+            Text('오늘의 하나', style: theme.textTheme.labelLarge?.copyWith(color: t.muted)),
+            const SizedBox(height: 8),
+            GalleryCard(recipe: today, large: true, onTap: () => startRecipe(context, today)),
+            const SizedBox(height: 24),
+          ],
           Text(
-            '로그인만 하세요.\n나머지는 에이전트가 합니다.',
-            style: TextStyle(
-              color: t.ink,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.72,
-              height: 1.35,
-            ),
+            '내 것부터 넣어 보세요',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: t.ink, height: 1.3),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'OpenAI · Claude · Gemini 중 원하는 모델이 웹사이트와 Gmail 을 대신 조작합니다. '
-            '결제와 메일 전송은 반드시 내 승인을 받은 뒤에만 합니다.',
-            style: TextStyle(color: t.muted, fontSize: 13.5, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Text('시작하기', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          _StepCard(
-            step: 1,
-            done: settings.isConfigured,
-            title: '모델 설정',
-            body: settings.isConfigured
-                ? (settings.runOnServer
-                      ? '서버에서 실행 · ${settings.serverUrl}'
-                      : '${settings.vendor.label} · ${settings.model(settings.vendor)}')
-                : '모델 탭에서 사용할 LLM 을 고르고 API 키(또는 ChatGPT 로그인)를 입력하세요.',
-            tab: AppTab.model,
-          ),
-          _StepCard(
-            step: 2,
-            done: loggedIn,
-            title: '서비스 로그인',
-            body: settings.runOnServer
-                ? '로그인 탭에서 서버 브라우저를 열어 쓸 서비스에 한 번만 로그인하세요.'
-                : '로그인 탭에서 쿠팡에 로그인하거나 Google 계정을 연결하세요. 로그인은 직접, 나머지는 에이전트가 합니다.',
-            tab: AppTab.accounts,
-          ),
-          _StepCard(
-            step: 3,
-            done: agent.chats.isNotEmpty,
-            title: '채팅으로 작업 맡기기',
-            body: '채팅 탭에서 새 채팅을 열고 할 일을 적으세요. 끝난 뒤에도 같은 채팅에서 이어서 지시할 수 있어요.',
-            tab: AppTab.chat,
-          ),
-          const _StepCard(
-            step: 4,
-            done: null,
-            title: '승인하기',
-            body: '결제·메일 전송 전에는 승인 카드가 뜹니다. 승인, 거절, 또는 "수량을 2개로" 같은 수정 요청을 할 수 있어요.',
-          ),
-          const SizedBox(height: 24),
-          Text('이렇게 말해 보세요', style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
-          for (final e in taskExamples)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.lightbulb_outline, size: 20),
-              title: Text(e),
-              trailing: const Icon(Icons.north_east, size: 18),
-              onTap: () {
-                if (agent.isBusy) {
-                  tabs.go(AppTab.chat);
-                  return;
-                }
-                openNewChat(context, draft: e);
-              },
+          Text('넣으면 그걸로 할 수 있는 일을 바로 보여드려요', style: TextStyle(color: t.muted, fontSize: 14)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: TossBigButton(label: '사진 찍기', icon: Icons.photo_camera_outlined, onPressed: () => _intake('photo'))),
+              const SizedBox(width: 10),
+              Expanded(child: TossBigButton(label: '파일 올리기', icon: Icons.upload_file_outlined, onPressed: () => _intake('file'))),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TossBigButton(label: '글 붙여넣기', icon: Icons.content_paste, filled: false, onPressed: () => _intake('text')),
+          const SizedBox(height: 28),
+          Text('이런 것도 돼요', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.98,
             ),
-          const SizedBox(height: 24),
-          Text('알아두면 좋아요', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          const _Tip(
-            icon: Icons.phone_iphone,
-            title: '실행 위치: 이 폰 / 서버',
-            body: '이 폰에서 실행하면 앱을 내렸을 때 멈출 수 있어요. 서버에서 실행하면 앱을 꺼도 계속되고, 어떤 웹 서비스든 다룰 수 있어요.',
+            itemCount: recipes.length,
+            itemBuilder: (_, i) => GalleryCard(recipe: recipes[i], onTap: () => startRecipe(context, recipes[i])),
           ),
-          const _Tip(
-            icon: Icons.front_hand_outlined,
-            title: '도움 요청',
-            body: '캡차·인증번호·결제 비밀번호처럼 사람이 해야 하는 일은 브라우저 화면을 띄워 직접 처리하도록 요청해요.',
-          ),
-          const _Tip(
-            icon: Icons.draw_outlined,
-            title: '내 말투로 답장',
-            body: 'Google 계정을 연결한 뒤 로그인 탭에서 "내 메일 말투"를 학습시키면 내가 쓴 것처럼 답장해요.',
-          ),
-          const _Tip(
-            icon: Icons.lock_outline,
-            title: '개인정보',
-            body: 'API 키는 기기 보안 저장소에만 저장되고, 사이트 비밀번호는 앱이 저장하지 않아요. 채팅 기록은 이 기기에만 남아요.',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.step,
-    required this.done,
-    required this.title,
-    required this.body,
-    this.tab,
-  });
-
-  final int step;
-
-  /// null 이면 완료 여부를 표시하지 않는다.
-  final bool? done;
-  final String title;
-  final String body;
-  final AppTab? tab;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 16,
-          backgroundColor: done == true ? t.accent : t.paper,
-          foregroundColor: done == true ? t.accentInk : t.muted,
-          child: done == true
-              ? const Icon(Icons.check_rounded, size: 18)
-              : Text('$step', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-        ),
-        title: Text(title),
-        subtitle: Text(body),
-        trailing: tab == null ? null : const Icon(Icons.chevron_right),
-        onTap: tab == null ? null : () => context.read<ShellTabs>().go(tab!),
-      ),
-    );
-  }
-}
-
-class _Tip extends StatelessWidget {
-  const _Tip({required this.icon, required this.title, required this.body});
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final t = AppTokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: t.muted),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 16),
+          Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text('다른 일이 있어요', style: TextStyle(color: t.muted, fontSize: 15)),
               children: [
-                Text(title, style: theme.textTheme.titleSmall),
-                const SizedBox(height: 2),
-                Text(body, style: TextStyle(color: t.muted, fontSize: 12.5, height: 1.5)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TossKeywordField(
+                        controller: _other,
+                        autofocus: false,
+                        placeholder: '예: 영수증 사진 정리',
+                        onSubmitted: _startOther,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(icon: const Icon(Icons.arrow_forward), onPressed: () => _startOther(_other.text)),
+                  ],
+                ),
+                const SizedBox(height: 8),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 넣은 내용으로 "이걸로 할 수 있는 일" 칩 3개를 띄운다. 서버가 3초 안에 안 주면 기본 칩.
+Future<void> showIntakeChips(BuildContext context, IntakeContent content) async {
+  final catalog = context.read<RecipeCatalog?>() ?? RecipeCatalog.empty();
+  final settings = context.read<SettingsStore>();
+  final client = settings.runOnServer ? settings.serverClient : null;
+  final defaults = catalog.intakeDefaults(content.kind);
+  final nav = Navigator.of(context);
+
+  final chips = ValueNotifier<UiPart?>(null);
+  String? summary;
+  unawaited(() async {
+    List<String> options = defaults;
+    if (client != null) {
+      try {
+        final j = await client.intake(content.toIntakeJson());
+        final ui = j?['ui'];
+        if (ui is Map) {
+          final part = UiPart.fromJson(ui);
+          if (part.type == UiPartType.chips && part.options.length >= 2) {
+            options = part.options;
+            summary = j?['summary'] as String?;
+          }
+        }
+      } on AgentServerException catch (e) {
+        if (e.statusCode == 429) summary = e.message;
+      } catch (_) {
+        // 늦거나 실패하면 기본 칩
+      }
+    }
+    chips.value = UiPart.fromJson({
+      'type': 'chips',
+      'question': '이걸로 할 수 있는 일',
+      'why': summary ?? content.name,
+      'options': options.take(6).toList(),
+      'allow_free': true,
+      'placeholder': '예: 표로 정리해줘',
+    });
+  }());
+
+  final picked = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 16 + MediaQuery.viewInsetsOf(ctx).bottom),
+        child: ValueListenableBuilder<UiPart?>(
+          valueListenable: chips,
+          builder: (_, part, _) => part == null
+              ? const _SkeletonChips()
+              : UiPartView(part: part, onAnswer: (v) => Navigator.pop(ctx, v)),
+        ),
+      ),
+    ),
+  );
+  chips.dispose();
+  if (picked == null || !context.mounted) return;
+
+  final recipe = catalog.find(picked) ??
+      Recipe.synthetic(
+        title: picked,
+        promptTemplate: '$picked: 넣은 내용으로 해줘. 결과는 표나 목록으로 보여줘. 내용: {content}',
+      );
+  if (!context.mounted) return;
+  // 즉석 레시피는 단계가 없으니 바로 확인 화면. 레시피면 첫 내용 단계를 건너뛰고 다음 단계부터.
+  unawaited(nav.maybePop().then((_) {
+    if (context.mounted) startRecipe(context, recipe, content: content);
+  }));
+}
+
+class _SkeletonChips extends StatelessWidget {
+  const _SkeletonChips();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('읽는 중…', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: t.ink)),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final w in [110.0, 90.0, 130.0])
+              Container(
+                width: w,
+                height: 36,
+                decoration: BoxDecoration(color: t.line, borderRadius: BorderRadius.circular(18)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+/// 갤러리 카드 = before/after 그림(없으면 회색 자리) + 제목 + 한 줄 (PRD 4.3).
+class GalleryCard extends StatelessWidget {
+  const GalleryCard({super.key, required this.recipe, required this.onTap, this.large = false});
+
+  final Recipe recipe;
+  final VoidCallback onTap;
+  final bool large;
+
+  Widget _pane(BuildContext context, String? asset, String label) {
+    final t = AppTokens.of(context);
+    Widget placeholder = Container(
+      color: t.line,
+      alignment: Alignment.center,
+      child: Text(label, style: TextStyle(color: t.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+    );
+    if (asset == null) return placeholder;
+    return Image.asset(asset, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppTokens.rSm),
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: t.paper,
+          borderRadius: BorderRadius.circular(AppTokens.rSm),
+          border: Border.all(color: t.lineStrong),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: large ? 140 : 88,
+              child: Row(
+                children: [
+                  Expanded(child: _pane(context, recipe.galleryBefore, '전')),
+                  Container(width: 1, color: t.lineStrong),
+                  Expanded(child: _pane(context, recipe.galleryAfter, '후')),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    recipe.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: large ? 17 : 15, fontWeight: FontWeight.w700, color: t.ink),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    recipe.galleryLine,
+                    maxLines: large ? 2 : 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: t.muted, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

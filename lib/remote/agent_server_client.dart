@@ -101,6 +101,31 @@ class AgentServerClient {
 
   Future<void> openUrl(String url) => _send('POST', '/browser/open', {'url': url});
 
+  /// 홈 "내 것부터 넣기": 내용을 보내면 그걸로 할 수 있는 일 칩(show_ui chips)을 돌려받는다.
+  /// 응답: {ui: {...}, summary, fallback}. 3초 안에 안 오면 [TimeoutException].
+  Future<Map<String, dynamic>?> intake(
+    Map<String, dynamic> content, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final res = await _client
+        .post(Uri.parse('$baseUrl/intake'), headers: _headers, body: jsonEncode(content))
+        .timeout(timeout);
+    final text = utf8.decode(res.bodyBytes);
+    if (res.statusCode == 401) throw AgentServerException('서버 토큰이 올바르지 않습니다.', 401);
+    if (res.statusCode >= 300) {
+      String msg = text;
+      try {
+        msg = '${(jsonDecode(text) as Map)['detail']}';
+      } catch (_) {}
+      throw AgentServerException(msg, res.statusCode);
+    }
+    final decoded = jsonDecode(text);
+    return decoded is Map ? decoded.cast<String, dynamic>() : null;
+  }
+
+  /// 레시피 카탈로그 (서버의 tasks.json). 앱 asset 과 같아야 한다.
+  Future<Map<String, dynamic>?> recipes() => _send('GET', '/recipes');
+
   Future<Uint8List?> screenshot(String id) async {
     final res = await _client.get(Uri.parse('$baseUrl/tasks/$id/screenshot'), headers: _headers);
     return res.statusCode == 200 ? res.bodyBytes : null;

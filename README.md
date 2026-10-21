@@ -34,6 +34,21 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
 ## 동작 흐름
 
 ```
+[첫 실행] 3문답 (하는 일 · 반복하는 일 · 폰/컴퓨터) ──▶ 프로필 저장 (시스템 프롬프트 "## 사용자")
+[홈] 사진 찍기 / 파일 올리기 / 글 붙여넣기 ──POST /intake──▶ "이걸로 할 수 있는 일" 칩 3개 (show_ui chips)
+[홈] 갤러리 카드(before/after) ──▶ 레시피 (server/app/tasks.json)
+      │
+      ▼
+[단계 화면] 한 화면에 질문 하나 · 칩 또는 키워드 · 최대 3개 ──▶ [확인] "이렇게 시킬까요?" 실행 · 고치기 · 복사
+      │
+      ▼
+[작업 화면] 한국어 단계 로그 + 브라우저 미니 화면 · show_ui 부품(표·전후 비교·체크리스트) · 승인 카드
+```
+
+아래는 에이전트 실행기의 도구 흐름이다.
+
+
+```
 [홈] 쿠팡 로그인 ──▶ 보이는 InAppWebView (사용자가 로그인) ──▶ 로그인 URL 감지 시 자동으로 닫힘
                                             │  (쿠키 공유)
 [홈] "생수 12개 담고 결제 승인 받아줘" ──▶ AgentRunner ──▶ HeadlessInAppWebView (화면 없음)
@@ -57,6 +72,26 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
 - 앱 홈 → **한국 주요 서비스** 에서 서비스를 골라 로그인해 두면, 에이전트가 그 계정으로 작업합니다.
 - 에이전트는 `service_info` 도구로 각 서비스의 시작·로그인·검색 URL 과 사용 팁을 확인합니다.
 - 카탈로그는 `server/app/services.json` 한 파일이며 앱(asset)과 서버가 함께 씁니다. 서비스 추가·수정은 이 파일만 고치면 됩니다.
+
+## 모바일 웹 (첫 버전은 웹으로만, PRD 7장)
+
+폰 폭(430px) 화면만 만든다. 데스크톱 브라우저에서는 가운데 폰 폭 컬럼으로 보인다.
+웹에는 API 키를 둘 수 없으므로 LLM 호출은 전부 `server/` 를 거친다 (서버가 운영자 키로 실행).
+
+```bash
+flutter build web --release \
+  --dart-define=AGENT_SERVER_URL=https://agent.example.com \
+  --dart-define=AGENT_SERVER_TOKEN=<웹 전용 토큰>
+vercel deploy --prod          # vercel.json 이 build/web 을 올린다
+```
+
+- `AGENT_SERVER_URL`·`AGENT_SERVER_TOKEN` 은 번들에 그대로 박힌다. 링크를 아는 사람은 누구나 서버를 쓸 수 있으니
+  **웹 전용 토큰을 따로 발급**하고, 서버 `.env` 의 `CORS_ORIGINS` 에 Vercel 도메인만 적고, 일일·월 한도를 켠다.
+- 사용자가 설정에서 서버 주소를 직접 저장하면 그 값이 빌드 값보다 우선한다.
+- 홈 흐름: 첫 실행 3문답 → 내 것부터 넣기(사진·파일·글) 또는 갤러리 카드 → 단계 화면(최대 3, 칩·키워드) → "이렇게 시킬까요?" → 실행.
+  기획: `docs/guided-agent-prd.md`, 구현 프롬프트: `docs/guided-agent-upgrade-prompt.md`.
+- 갤러리 before/after 이미지는 `assets/gallery/<id>_before.png`·`_after.png`. 없으면 회색 자리 표시자.
+  필요한 파일: bible, bibleq, notice, excel, photo, shift, resume, job, coupang, summary (각 2장).
 
 ## 폴더 구조
 

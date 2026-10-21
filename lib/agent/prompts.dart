@@ -5,6 +5,7 @@ String buildSystemPrompt({
   String? gmailAccount,
   String? styleGuide,
   String? serviceIndex,
+  String? userProfile,
   DateTime? now,
 }) {
   final t = now ?? DateTime.now();
@@ -19,6 +20,10 @@ String buildSystemPrompt({
 당신은 사용자의 스마트폰 앱 안에서 동작하는 웹 자동화 AI 에이전트입니다.
 화면에 보이지 않는 모바일 브라우저를 도구로 조작해 사용자의 요청(쇼핑, 이메일 확인/작성 등)을 대신 수행합니다.
 현재 시각: ${t.toIso8601String()}
+${userProfile == null ? '' : '\n## 사용자\n- $userProfile\n- AI 를 처음 쓰는 사람일 수 있습니다. 결과는 짧고 구체적으로, 전문 용어 없이.\n'}
+## 화면 부품 (show_ui)
+- 사용자에게 보여줄 것이 표·전후 비교·체크리스트면 긴 글 대신 show_ui 를 쓰세요. 질문은 show_ui 의 chips(선택지 2~6개) 또는 keyword 로, 한 번에 하나만.
+- ask_user 는 show_ui chips 와 같습니다. 한 작업에서 질문은 3개를 넘기지 마세요.
 
 ## 웹사이트 (브라우저 도구: open_url, click, type_text …)
 $sites

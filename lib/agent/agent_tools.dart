@@ -18,6 +18,7 @@ class AgentTools {
   static const gmailRead = 'gmail_read';
   static const gmailSend = 'gmail_send';
   static const gmailStyleExamples = 'gmail_style_examples';
+  static const showUi = 'show_ui';
 
   static const _elementId = {
     'type': 'integer',
@@ -241,6 +242,21 @@ class AgentTools {
           'summary': {'type': 'string', 'description': '한국어 결과 보고 (무엇을 했는지, 확인한 내용, 남은 일)'},
         },
         'required': ['summary'],
+      },
+    ),
+    const ToolSpec(
+      name: showUi,
+      description:
+          '사용자 화면에 부품 하나를 그린다. 긴 글 대신 표·전후 비교·체크리스트로 보여주거나, 칩·한 줄 입력으로 묻는다. '
+          'type: chips(question, options 2~6개, allow_free) | keyword(question, placeholder) | file_button(question, label, accept) | '
+          'confirm(sentence) | table(headers, rows ≤20) | before_after(before, after) | checklist(items ≤12, done) | text_block(text). '
+          'chips·keyword·file_button·confirm 은 사용자의 답을 돌려받는다. 그 외는 바로 표시만 한다.',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'ui': {'type': 'object', 'description': '부품 JSON. "type" 필드 필수.'},
+        },
+        'required': ['ui'],
       },
     ),
   ];

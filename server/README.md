@@ -53,13 +53,27 @@ HEADLESS=0 DATA_DIR=./data python -m uvicorn app.main:create_app --factory --hos
 | DELETE | `/tasks/{id}` | 작업 기록 삭제 |
 | GET | `/tasks/current`, `/tasks/{id}?since=N` | 상태·로그(N 번째 이후)·대기 중인 승인/질문/도움 |
 | POST | `/tasks/{id}/approval` `{approved, feedback}` | 승인/거절 |
-| POST | `/tasks/{id}/answer` `{text}` | 질문 답변 |
+| POST | `/tasks/{id}/answer` `{text}` | 질문 답변 (ask_user 와 show_ui 칩·키워드·파일·확인 답 모두) |
 | POST | `/tasks/{id}/help_done` | 사용자 도움 완료 |
 | POST | `/tasks/{id}/followup` `{prompt}` | 이어서 지시 |
 | POST | `/tasks/{id}/cancel` | 취소 |
 | GET | `/tasks/{id}/screenshot` | 최근 화면 (JPEG) |
 | POST | `/browser/open` `{url}` | 로그인용으로 사이트 열기 |
 | WS | `/live?token=` | 실시간 화면(`frame`) 수신, `tap/type/key/scroll/back/navigate` 전송 |
+| GET | `/recipes` | 레시피 카탈로그 전체 (`app/tasks.json`) |
+| POST | `/intake` `{kind: photo\|file\|text, name?, text?, image_base64?, mime?}` | 올린 내용으로 할 수 있는 일 3개를 `chips` 부품으로. 8초 안에 못 받으면 기본 칩 |
+| GET | `/usage` | 오늘·이달 LLM 호출 수와 한도 |
+
+작업 상태의 `pending.type` 에 `ui` 가 추가됐다. `pending.ui` 는 `app/ui_schema.json` 의 부품 8종 중 하나이며, 앱은 그 부품을 그리고 답을 `/answer` 로 보낸다. 결과 표시용 부품(table·before_after·checklist·text_block)은 로그 `kind: "ui"` 에 `detail` 로 JSON 이 들어온다.
+
+### 환경 변수 (추가)
+
+| 변수 | 뜻 |
+| --- | --- |
+| `DAILY_REQUEST_LIMIT`, `MONTHLY_REQUEST_LIMIT` | LLM 호출 수 한도 (0 = 무제한). 넘으면 `/tasks` `/followup` `/intake` 가 429 "오늘은 여기까지예요" |
+| `CORS_ORIGINS` | 웹 앱 출처. 쉼표 구분, 기본 `*` |
+
+가족 검증처럼 비용 없이 돌리려면 `LLM_PROVIDER=gemini` + 무료 등급 키 + `DAILY_REQUEST_LIMIT` 을 권한다. 호출 수는 `data/usage.json` 에 남는다.
 
 모든 요청은 `Authorization: Bearer <AGENT_TOKEN>` 이 필요합니다.
 

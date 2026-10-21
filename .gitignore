@@ -52,3 +52,7 @@ server/data/
 server/.env
 **/__pycache__/
 .pytest_cache/
+
+# python venv
+server/.venv/
+server/data/
