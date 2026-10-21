@@ -10,6 +10,7 @@ import 'browser_pip.dart';
 import '../recipes/recipe_catalog.dart';
 import '../ui_parts/ui_part.dart';
 import 'main_shell.dart';
+import 'step_screen.dart' show startRecipe;
 import 'ui_renderer.dart';
 
 /// 새 채팅을 열고 작업 화면으로 간다. [draft] 가 있으면 입력창에 미리 채운다.
@@ -167,6 +168,8 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
               ),
             ),
+          if (!agent.isBusy && agent.status == AgentStatus.finished && agent.lastRecipeId != null)
+            _NextRecipeCard(agent: agent),
           if (!agent.isBusy && !fresh && !agent.hasConversation)
             SafeArea(
               top: false,
@@ -561,3 +564,40 @@ String statusLabel(AgentStatus s) => switch (s) {
   AgentStatus.failed => '작업 실패',
   AgentStatus.cancelled => '작업 취소됨',
 };
+
+
+/// 작업이 끝난 뒤 카탈로그의 next 레시피 하나를 제안한다 (PRD 5.5, F7).
+class _NextRecipeCard extends StatelessWidget {
+  const _NextRecipeCard({required this.agent});
+
+  final AgentController agent;
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = context.read<RecipeCatalog?>();
+    final current = catalog?.byId(agent.lastRecipeId!);
+    final nextId = current?.next;
+    final next = nextId == null ? null : catalog?.byId(nextId);
+    if (next == null) return const SizedBox.shrink();
+    final t = AppTokens.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            leading: const Icon(Icons.arrow_forward),
+            title: Text('다음에 이것도: ${next.title}'),
+            subtitle: Text(next.can, style: TextStyle(color: t.muted)),
+            onTap: () {
+              agent.newSession();
+              Navigator.of(context).popUntil((r) => r.isFirst);
+              startRecipe(context, next);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}

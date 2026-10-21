@@ -65,6 +65,9 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
   /// 지금 화면에 보이는(작업 중인) 대화.
   ChatSession get current => _current;
 
+  /// 확인 화면에서 실행한 레시피 id. 작업이 끝나면 카탈로그의 next 레시피를 "다음 할 일"로 보여준다.
+  String? lastRecipeId;
+
   List<AgentLogEntry> get logs => _current.logs;
   AgentStatus get status => _current.status;
   set status(AgentStatus s) => _current.status = s;
@@ -125,6 +128,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   /// 새 채팅을 연다 (진행 중인 작업이 있으면 열 수 없다).
   void newSession() {
+    lastRecipeId = null;
     if (isBusy || _current.isEmpty) return;
     _switchTo(ChatSession(id: _newId()));
   }

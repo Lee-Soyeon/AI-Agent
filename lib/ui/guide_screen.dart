@@ -199,7 +199,7 @@ Future<void> showIntakeChips(BuildContext context, IntakeContent content) async 
   final recipe = catalog.find(picked) ??
       Recipe.synthetic(
         title: picked,
-        promptTemplate: '$picked: 첨부 내용으로 해줘. 결과는 show_ui 로 보여줘. 내용: {content}',
+        promptTemplate: '$picked: 넣은 내용으로 해줘. 결과는 표나 목록으로 보여줘. 내용: {content}',
       );
   if (!context.mounted) return;
   // 즉석 레시피는 단계가 없으니 바로 확인 화면. 레시피면 첫 내용 단계를 건너뛰고 다음 단계부터.

@@ -76,6 +76,7 @@ class ConfirmScreen extends StatelessWidget {
                 if (!await ensureReady(context)) return;
                 if (!context.mounted) return;
                 final nav = Navigator.of(context);
+                agent.lastRecipeId = intake.recipe.id;
                 agent.startTask(sentence);
                 nav.popUntil((r) => r.isFirst);
                 nav.push(MaterialPageRoute(builder: (_) => const TaskScreen()));

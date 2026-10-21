@@ -105,7 +105,7 @@ class AgentServerClient {
   /// 응답: {ui: {...}, summary, fallback}. 3초 안에 안 오면 [TimeoutException].
   Future<Map<String, dynamic>?> intake(
     Map<String, dynamic> content, {
-    Duration timeout = const Duration(seconds: 3),
+    Duration timeout = const Duration(seconds: 8),
   }) async {
     final res = await _client
         .post(Uri.parse('$baseUrl/intake'), headers: _headers, body: jsonEncode(content))

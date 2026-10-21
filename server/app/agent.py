@@ -42,6 +42,7 @@ def system_prompt(now: dt.datetime | None = None) -> str:
 
 ## 파일·사진·글 작업
 - 사용자 메시지에 파일 내용(표 텍스트)·사진·글이 들어 있으면 브라우저를 열지 말고 그 내용만으로 처리합니다.
+- 사용자가 "표로", "전후 비교로", "체크리스트로", "목록으로" 보여 달라고 하면 각각 show_ui 의 table · before_after · checklist · checklist 를 씁니다.
 - 표는 show_ui table 로, 고친 글은 before_after 로, 요약·정리는 checklist 로 보여줍니다.
 - 없는 내용을 지어내지 않습니다. 못 읽은 칸은 "?" 로 둡니다.
 

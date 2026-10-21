@@ -88,7 +88,7 @@
         {"id": "column", "kind": "chips", "why": "같은 형식으로 채우려면 머리글이 필요해요", "text": "어느 열을 채울까요?", "options_from": "file.headers", "allow_free": true},
         {"id": "values", "kind": "keyword", "text": "들어갈 값의 종류는?", "placeholder": "예: 식품·생활·전자", "options": ["파일에 있는 것 그대로"]}
       ],
-      "prompt_template": "첨부한 엑셀의 다른 열을 보고 '{column}' 열을 채워줘. 값은 {values} 중 하나. 확신이 없는 행은 비워 두고 맨 아래에 목록으로 알려줘. 결과는 show_ui 의 table 로 보여줘. 파일 내용: {file}",
+      "prompt_template": "첨부한 엑셀의 다른 열을 보고 '{column}' 열을 채워줘. 값은 {values} 중 하나. 확신이 없는 행은 비워 두고 맨 아래에 목록으로 알려줘. 결과는 표로 보여줘. 파일 내용: {file}",
       "next": "excel_summary",
       "gallery": {"before": "assets/gallery/excel_before.png", "after": "assets/gallery/excel_after.png", "line": "빈 열 → 채워진 열"}
     },
@@ -104,7 +104,7 @@
         {"id": "photo", "kind": "photo", "text": "사진을 찍거나 골라 주세요", "button": "사진 찍기", "accept": "photo"},
         {"id": "columns", "kind": "chips", "text": "어떤 표로 만들까요?", "options": ["사진에 있는 그대로", "품목·수량·금액", "이름·연락처"], "allow_free": true}
       ],
-      "prompt_template": "첨부한 사진의 글자를 읽어서 표로 옮겨줘. 열 구성: {columns}. 못 읽은 칸은 '?'로 두고, 결과는 show_ui 의 table 로 보여줘.",
+      "prompt_template": "첨부한 사진의 글자를 읽어서 표로 옮겨줘. 열 구성: {columns}. 못 읽은 칸은 '?'로 두고, 결과는 표로 보여줘.",
       "next": "excel_summary",
       "gallery": {"before": "assets/gallery/photo_before.png", "after": "assets/gallery/photo_after.png", "line": "사진 → 표"}
     },
@@ -120,7 +120,7 @@
         {"id": "source", "kind": "text", "text": "근무 메모를 붙여 넣어 주세요", "placeholder": "예: 월 9-3 민수, 화 2-8 지연 …", "button": "사진 찍기"},
         {"id": "unit", "kind": "chips", "text": "어떻게 묶을까요?", "options": ["요일별", "사람별"], "allow_free": false}
       ],
-      "prompt_template": "다음 근무 메모를 {unit} 표로 정리해줘. 겹치거나 비는 시간이 있으면 표 아래에 한 줄로 알려줘. 결과는 show_ui 의 table 로. 메모: {source}",
+      "prompt_template": "다음 근무 메모를 {unit} 표로 정리해줘. 겹치거나 비는 시간이 있으면 표 아래에 한 줄로 알려줘. 결과는 표로. 메모: {source}",
       "next": null,
       "gallery": {"before": "assets/gallery/shift_before.png", "after": "assets/gallery/shift_after.png", "line": "메모 → 근무표"}
     },
@@ -136,7 +136,7 @@
         {"id": "source", "kind": "text", "text": "자기소개서를 붙여 넣어 주세요", "placeholder": "문항과 답을 그대로"},
         {"id": "goal", "kind": "chips", "why": "무엇을 바꿀지 정해야 과하게 고치지 않아요", "text": "무엇을 고칠까요?", "options": ["문장만 다듬기", "분량 줄이기", "근거 보강 질문"], "allow_free": true}
       ],
-      "prompt_template": "다음 자기소개서를 '{goal}' 방향으로만 고쳐줘. 없는 경험은 절대 추가하지 말고, 바꾼 부분은 show_ui 의 before_after 로 보여줘. 글: {source}",
+      "prompt_template": "다음 자기소개서를 '{goal}' 방향으로만 고쳐줘. 없는 경험은 절대 추가하지 말고, 바꾼 부분은 전후 비교로 보여줘. 글: {source}",
       "next": "job_summary",
       "gallery": {"before": "assets/gallery/resume_before.png", "after": "assets/gallery/resume_after.png", "line": "초안 → 다듬은 글"}
     },
@@ -151,7 +151,7 @@
       "steps": [
         {"id": "source", "kind": "keyword", "text": "공고 링크나 글을 붙여 넣어 주세요", "placeholder": "https:// 또는 공고 본문"}
       ],
-      "prompt_template": "다음 채용 공고를 읽고 자격 요건·마감일·우대 사항·근무지를 show_ui 의 checklist 로 정리해줘. 링크면 열어서 읽어. 공고: {source}",
+      "prompt_template": "다음 채용 공고를 읽고 자격 요건·마감일·우대 사항·근무지를 체크리스트로 정리해줘. 링크면 열어서 읽어. 공고: {source}",
       "next": "resume_fix",
       "gallery": {"before": "assets/gallery/job_before.png", "after": "assets/gallery/job_after.png", "line": "공고 → 체크리스트"}
     },
@@ -182,7 +182,7 @@
       "steps": [
         {"id": "file", "kind": "file", "text": "표 파일을 올려주세요", "button": "파일 올리기", "accept": "file"}
       ],
-      "prompt_template": "첨부한 표를 읽고 합계와 눈에 띄는 점을 3줄로 요약해줘. 결과는 show_ui 의 checklist 로. 파일 내용: {file}",
+      "prompt_template": "첨부한 표를 읽고 합계와 눈에 띄는 점을 3줄로 요약해줘. 결과는 체크리스트로. 파일 내용: {file}",
       "next": null,
       "gallery": {"before": "assets/gallery/summary_before.png", "after": "assets/gallery/summary_after.png", "line": "표 → 3줄 요약"}
     }
