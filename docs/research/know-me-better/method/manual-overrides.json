@@ -1,0 +1,16 @@
+{"codes": {
+ "P0088": {"rel": "Y", "dims": ["D15"], "flags": [], "data": ["experiment"], "cmp": "none", "find": "GPT-4가 틀린 믿음 과제 75% 해결(6세 아동 수준): 타인 마음 상태를 모델링하는 능력"},
+ "P0033": {"find": "컴퓨터 r=.56 > 친구 .49, 좋아요 300개≈배우자; 13개 실제 결과 중 4개는 본인 자기평가보다 잘 예측"},
+ "P0005": {"find": "ChatGPT 대화 분석+19명 인터뷰: 잘못된 멘탈모델·다크패턴이 위험 인식을 막고, 사람 같은 대화가 민감한 공개를 늘림"},
+ "P0006": {"dims": ["D13"], "flags": ["P"], "find": "페이스북 피드 알고리즘에 대한 사용자 민속이론과 그에 따른 행동 변화"}
+},
+"add": [
+ {"pid": "M0001", "title": "The Algorithmic Self-Portrait: Deconstructing Memory in ChatGPT", "authors": "Dash, Das, Kirsten et al.", "year": 2026, "venue": "The ACM Web Conference 2026 (WWW '26)", "tier": "A", "cites": null, "doi": "10.1145/3774904.3792671", "topics": ["T6", "T10"], "sources": ["manual-2026"],
+  "c": {"rel": "Y", "dims": ["D10", "D3"], "flags": ["E", "P"], "data": ["chat-logs"], "cmp": "none", "find": "실사용자 80명의 ChatGPT 메모리 2,050건: 96%는 시스템이 자동 생성, 52%에 심리적 통찰, 28%에 GDPR상 개인정보"}},
+ {"pid": "M0002", "title": "AI Never Forgets: Exploring Users' Perceptions of AI Memory and ChatGPT's Memory Feature", "authors": "Chen, Molina, Liao, Cho", "year": 2026, "venue": "CHI Conference on Human Factors in Computing Systems (CHI '26)", "tier": "A", "cites": null, "doi": "", "topics": ["T6", "T10"], "sources": ["manual-2026"],
+  "c": {"rel": "Y", "dims": ["D9"], "flags": ["P", "E"], "data": ["interviews"], "cmp": "none", "find": "20명 인터뷰: 메모리는 관계 형성에 도움되지만 다수가 기억 내용을 본 뒤 부정적 기대 위반을 경험, 가시성·통제 요구"}},
+ {"pid": "M0003", "title": "Can LLMs Infer Conversational Agent Users' Personality Traits from Chat History?", "authors": "Cögendez, Zimmermann, Zufferey", "year": 2026, "venue": "arXiv preprint (ETH Zurich)", "tier": "C", "cites": null, "doi": "10.48550/arXiv.2604.19785", "topics": ["T4", "T6"], "sources": ["manual-2026"],
+  "c": {"rel": "Y", "dims": ["D1", "D14"], "flags": ["E"], "data": ["chat-logs", "self-report"], "cmp": "none", "find": "668명의 ChatGPT 대화 약 6.2만 건으로 Big Five 추정, 외향성·신경증이 상대적으로 정확"}},
+ {"pid": "M0004", "title": "Investigating Affective Use and Emotional Well-being on ChatGPT / How AI and Human Behaviors Shape Psychosocial Effects of Chatbot Use", "authors": "Phang, Lampe, Ahmad et al.; Fang, Liu, Danry et al.", "year": 2025, "venue": "OpenAI · MIT Media Lab (arXiv preprints)", "tier": "C", "cites": null, "doi": "", "topics": ["T6", "T10"], "sources": ["manual-2025"],
+  "c": {"rel": "Y", "dims": ["D3", "D9"], "flags": ["P"], "data": ["chat-logs", "experiment"], "cmp": "none", "find": "약 1,000명 4주 RCT: 하루 사용량이 많을수록 외로움·정서적 의존·문제적 사용이 높고 사회활동은 낮음(상관)"}}
+]}
