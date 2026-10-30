@@ -73,8 +73,8 @@ class AiAgentApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
-      // Aidol 처럼 검은 바탕이 기본.
-      themeMode: ThemeMode.dark,
+      // 흰 바탕 흑백이 기본 (기기 다크 모드를 따르지 않는다).
+      themeMode: ThemeMode.light,
       // 모바일 웹 먼저 (PRD 7): 넓은 화면에서는 가운데 폰 폭 컬럼으로.
       builder: (context, child) => PhoneFrame(child: child ?? const SizedBox.shrink()),
       home: const MainShell(),
