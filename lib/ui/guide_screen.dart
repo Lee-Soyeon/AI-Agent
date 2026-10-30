@@ -62,8 +62,9 @@ class _GuideScreenState extends State<GuideScreen> {
     final catalog = context.read<RecipeCatalog?>() ?? RecipeCatalog.empty();
     final theme = Theme.of(context);
     final t = AppTokens.of(context);
-    final today = catalog.todays();
-    final recipes = catalog.forPersona(settings.persona);
+    final today = catalog.todays(null, settings.persona, settings.routine);
+    final recipes = catalog.forPersona(settings.persona, routine: settings.routine).where((r) => r != today).toList();
+    final others = catalog.othersFor(settings.persona);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI Agent')),
@@ -96,18 +97,16 @@ class _GuideScreenState extends State<GuideScreen> {
           const SizedBox(height: 28),
           Text('이런 것도 돼요', style: theme.textTheme.titleMedium),
           const SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.98,
+          _RecipeGrid(recipes: recipes),
+          if (others.isNotEmpty)
+            Theme(
+              data: theme.copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text('다른 일 더 보기', style: TextStyle(color: t.muted, fontSize: 15)),
+                children: [_RecipeGrid(recipes: others)],
+              ),
             ),
-            itemCount: recipes.length,
-            itemBuilder: (_, i) => GalleryCard(recipe: recipes[i], onTap: () => startRecipe(context, recipes[i])),
-          ),
           const SizedBox(height: 16),
           Theme(
             data: theme.copyWith(dividerColor: Colors.transparent),
@@ -237,24 +236,33 @@ class _SkeletonChips extends StatelessWidget {
   }
 }
 
-/// 갤러리 카드 = before/after 그림(없으면 회색 자리) + 제목 + 한 줄 (PRD 4.3).
+class _RecipeGrid extends StatelessWidget {
+  const _RecipeGrid({required this.recipes});
+
+  final List<Recipe> recipes;
+
+  @override
+  Widget build(BuildContext context) => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      mainAxisExtent: 92,
+    ),
+    itemCount: recipes.length,
+    itemBuilder: (_, i) => GalleryCard(recipe: recipes[i], onTap: () => startRecipe(context, recipes[i])),
+  );
+}
+
+/// 갤러리 카드 = 제목 + 한 줄. 전후 그림은 실제 결과물 캡처가 생기면 다시 넣는다 (PRD 4.3).
 class GalleryCard extends StatelessWidget {
   const GalleryCard({super.key, required this.recipe, required this.onTap, this.large = false});
 
   final Recipe recipe;
   final VoidCallback onTap;
   final bool large;
-
-  Widget _pane(BuildContext context, String? asset, String label) {
-    final t = AppTokens.of(context);
-    Widget placeholder = Container(
-      color: t.line,
-      alignment: Alignment.center,
-      child: Text(label, style: TextStyle(color: t.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-    );
-    if (asset == null) return placeholder;
-    return Image.asset(asset, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -272,18 +280,8 @@ class GalleryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: large ? 140 : 88,
-              child: Row(
-                children: [
-                  Expanded(child: _pane(context, recipe.galleryBefore, '전')),
-                  Container(width: 1, color: t.lineStrong),
-                  Expanded(child: _pane(context, recipe.galleryAfter, '후')),
-                ],
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: EdgeInsets.fromLTRB(14, large ? 16 : 12, 14, large ? 16 : 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -296,7 +294,7 @@ class GalleryCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     recipe.galleryLine,
-                    maxLines: large ? 2 : 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: t.muted, fontSize: 13),
                   ),

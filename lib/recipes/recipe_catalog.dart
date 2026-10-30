@@ -124,20 +124,33 @@ class RecipeCatalog {
   /// 제목이 정확히 같은 레시피.
   Recipe? find(String title) => recipes.where((r) => r.title.trim() == title.trim()).firstOrNull;
 
-  /// 페르소나에 맞는 것이 앞, 나머지는 원래 순서.
-  List<Recipe> forPersona(String? persona) {
+  /// 내 직업에 맞는 것만. 반복하는 일([routine])과 이름이 겹치는 것이 맨 앞. 직업을 안 골랐으면 전부.
+  List<Recipe> forPersona(String? persona, {String? routine}) {
     if (persona == null || persona.isEmpty) return List.of(recipes);
     final mine = recipes.where((r) => r.personas.contains(persona)).toList();
-    final rest = recipes.where((r) => !r.personas.contains(persona)).toList();
-    return [...mine, ...rest];
+    final word = (routine ?? '').trim().split(RegExp(r'\s+')).first;
+    if (word.length < 2 || word == '없음') return mine;
+    bool hit(Recipe r) => r.title.contains(word) || r.galleryLine.contains(word);
+    return [...mine.where(hit), ...mine.where((r) => !hit(r))];
   }
 
-  /// 오늘의 하나 (날짜로 순환).
-  Recipe? todays([DateTime? now]) {
-    if (recipes.isEmpty) return null;
+  /// 내 직업에 안 맞는 나머지 (원래 순서).
+  List<Recipe> othersFor(String? persona) {
+    if (persona == null || persona.isEmpty) return const [];
+    return recipes.where((r) => !r.personas.contains(persona)).toList();
+  }
+
+  /// 오늘의 하나: 반복하는 일과 맞는 것이 있으면 그것, 없으면 내 것 중에서 날짜로 순환.
+  Recipe? todays([DateTime? now, String? persona, String? routine]) {
+    final pool = forPersona(persona, routine: routine);
+    if (pool.isEmpty) return null;
+    final word = (routine ?? '').trim().split(RegExp(r'\s+')).first;
+    if (word.length >= 2 && word != '없음' && (pool.first.title.contains(word) || pool.first.galleryLine.contains(word))) {
+      return pool.first;
+    }
     final d = now ?? DateTime.now();
     final doy = d.difference(DateTime(d.year, 1, 1)).inDays;
-    return recipes[doy % recipes.length];
+    return pool[doy % pool.length];
   }
 
   /// 입력 종류(photo | file | text)로 할 수 있는 레시피.

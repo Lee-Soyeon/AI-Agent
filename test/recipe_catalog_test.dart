@@ -31,13 +31,16 @@ void main() {
     expect(c.intakeDefaults('file').length, 3);
   });
 
-  test('forPersona 는 내 것이 앞, 나머지는 뒤에 전부', () {
+  test('forPersona 는 내 직업 것만, 반복하는 일과 맞는 것이 맨 앞', () {
     final c = RecipeCatalog.fromJson(source);
-    final list = c.forPersona('home');
-    expect(list.length, c.recipes.length);
-    final firstOther = list.indexWhere((r) => !r.personas.contains('home'));
-    final lastMine = list.lastIndexWhere((r) => r.personas.contains('home'));
-    expect(lastMine, lessThan(firstOther));
+    final list = c.forPersona('parttime');
+    expect(list, isNotEmpty);
+    expect(list.every((r) => r.personas.contains('parttime')), isTrue);
+    expect(c.othersFor('parttime').every((r) => !r.personas.contains('parttime')), isTrue);
+    expect(list.length + c.othersFor('parttime').length, c.recipes.length);
+    expect(c.forPersona('parttime', routine: '엑셀 정리').first.title, contains('엑셀'));
+    expect(c.todays(DateTime(2026, 1, 1), 'parttime', '엑셀 정리')?.title, contains('엑셀'));
+    expect(c.forPersona('').length, c.recipes.length);
   });
 
   test('find · byId · todays · next 참조가 존재', () {
@@ -45,6 +48,7 @@ void main() {
     expect(c.find('엑셀 빈 열 채우기')?.id, 'excel_fill');
     expect(c.find('없는 제목'), isNull);
     expect(c.todays(DateTime(2026, 1, 1))?.id, c.recipes.first.id);
+    expect(c.todays(DateTime(2026, 10, 30), 'home')?.personas, contains('home'));
     for (final r in c.recipes) {
       if (r.next != null) expect(c.byId(r.next!), isNotNull, reason: '${r.id}.next');
     }
