@@ -81,9 +81,15 @@ OpenAI · Claude · Gemini · Grok · OpenRouter 중 원하는 LLM으로 **웹�
 ```bash
 flutter build web --release \
   --dart-define=AGENT_SERVER_URL=https://agent.example.com \
-  --dart-define=AGENT_SERVER_TOKEN=<웹 전용 토큰>
+  --dart-define=AGENT_SERVER_TOKEN=<웹 전용 토큰> \
+  --dart-define=GOOGLE_WEB_CLIENT_ID=989545914408-728isud2mnts51db2jh6h5nlmihmi49i.apps.googleusercontent.com
 vercel deploy --prod          # vercel.json 이 build/web 을 올린다
 ```
+
+- `GOOGLE_WEB_CLIENT_ID` 가 있으면 첫 화면이 "Google 계정으로 계속하기"다 (가입·로그인 겸용, 이름·이메일만).
+  Google Cloud `aioia-official` 프로젝트의 OAuth 클라이언트 "AI Agent web login". 승인된 JavaScript 원본에
+  배포 주소와 `http://localhost:8765` 가 들어 있다. 새 도메인에 올리면 원본에 추가해야 로그인이 된다.
+- Vercel Git 자동 배포는 Flutter 를 빌드하지 않아 빈 사이트를 올린다. 웹은 위 명령으로 직접 올린다.
 
 - `AGENT_SERVER_URL`·`AGENT_SERVER_TOKEN` 은 번들에 그대로 박힌다. 링크를 아는 사람은 누구나 서버를 쓸 수 있으니
   **웹 전용 토큰을 따로 발급**하고, 서버 `.env` 의 `CORS_ORIGINS` 에 Vercel 도메인만 적고, 일일·월 한도를 켠다.
