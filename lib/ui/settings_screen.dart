@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/settings_store.dart';
+import '../google/google_auth.dart';
 import '../llm/model_list.dart';
 import '../remote/agent_server_client.dart';
 import 'chatgpt_login.dart';
@@ -218,6 +219,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           const ChatGptAccountTile(),
           const Divider(height: 32),
+          if (GoogleAuthService.loginRequired)
+            Builder(
+              builder: (context) {
+                final google = context.watch<GoogleAuthService>();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.account_circle_outlined),
+                  title: Text(google.name ?? google.email ?? '내 계정'),
+                  subtitle: google.email == null ? null : Text(google.email!),
+                  trailing: TextButton(onPressed: google.signOut, child: const Text('로그아웃')),
+                );
+              },
+            ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.person_outline),

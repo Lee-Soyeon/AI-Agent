@@ -218,7 +218,7 @@ class _GmailCard extends StatelessWidget {
             leading: const CircleAvatar(child: Icon(Icons.mail)),
             title: const Text('Gmail'),
             subtitle: Text(
-              google.isSignedIn ? '${google.email} · Gmail API 연결됨' : 'Google 계정 연결이 필요합니다',
+              google.gmailConnected ? '${google.email} · Gmail API 연결됨' : 'Gmail 권한이 필요합니다',
             ),
             trailing: google.busy
                 ? const SizedBox(
@@ -226,16 +226,16 @@ class _GmailCard extends StatelessWidget {
                     height: 24,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : google.isSignedIn
+                : google.gmailConnected
                 ? PopupMenuButton<String>(
                     onSelected: (_) => google.signOut(),
                     itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'logout', child: Text('연결 해제 (권한 철회)')),
+                      PopupMenuItem(value: 'logout', child: Text('로그아웃 (권한 철회)')),
                     ],
                   )
-                : FilledButton.tonal(onPressed: google.signIn, child: const Text('Google 계정 연결')),
+                : FilledButton.tonal(onPressed: google.connectGmail, child: const Text('Gmail 연결')),
           ),
-          if (google.error != null && !google.isSignedIn)
+          if (google.error != null && !google.gmailConnected)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Text(
@@ -243,7 +243,7 @@ class _GmailCard extends StatelessWidget {
                 style: TextStyle(color: AppTokens.of(context).errorInk, fontSize: 12),
               ),
             ),
-          if (google.isSignedIn)
+          if (google.gmailConnected)
             Builder(
               builder: (context) {
                 final style = context.watch<WritingStyleStore>();

@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 
 import '../agent/agent_controller.dart';
 import '../core/settings_store.dart';
+import '../google/google_auth.dart';
 import 'app_theme.dart';
 import 'accounts_screen.dart';
 import 'chat_list_screen.dart';
 import 'guide_screen.dart';
+import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import 'settings_screen.dart';
 
@@ -44,6 +46,11 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tab = context.watch<ShellTabs>().tab;
+    if (GoogleAuthService.loginRequired) {
+      final google = context.watch<GoogleAuthService>();
+      if (!google.ready) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      if (!google.isSignedIn) return const LoginScreen();
+    }
     if (!context.watch<SettingsStore>().onboardingDone) return const OnboardingScreen();
     return Scaffold(
       // 본문이 탭 바 뒤까지 이어지고, 탭 바 높이만큼 MediaQuery 아래 여백이 생긴다.

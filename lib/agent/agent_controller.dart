@@ -234,7 +234,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
       browser: _browser,
       hooks: this,
       maxSteps: settings.maxSteps,
-      gmail: google.isSignedIn ? GmailApi(authHeaders: google.authHeaders) : null,
+      gmail: google.gmailConnected ? GmailApi(authHeaders: google.authHeaders) : null,
       gmailAddress: google.email,
       catalog: catalog,
       systemPrompt: buildSystemPrompt(
@@ -250,7 +250,7 @@ class AgentController extends ChangeNotifier with WidgetsBindingObserver impleme
 
   /// 보낸 메일함을 분석해 말투를 학습한다 (현재 선택된 LLM 사용).
   Future<void> learnWritingStyle() async {
-    if (!google.isSignedIn || !settings.isLocalLlmConfigured) return;
+    if (!google.gmailConnected || !settings.isLocalLlmConfigured) return;
     await writingStyle.learn(
       llm: settings.createProvider(),
       gmail: GmailApi(authHeaders: google.authHeaders),
