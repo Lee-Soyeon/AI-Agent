@@ -1,0 +1,11 @@
+build
+.dart_tool
+android
+ios
+macos
+linux
+windows
+test
+webapp/node_modules
+webapp/dist
+server/.venv
