@@ -72,6 +72,8 @@ class GoogleAuthService extends ChangeNotifier {
           unawaited(_checkGmail());
         },
         onError: (Object e) {
+          // 자동 로그인 창(One Tap)을 닫은 것은 오류가 아니다.
+          if (e is GoogleSignInException && e.code == GoogleSignInExceptionCode.canceled) return;
           error = _describe(e);
           notifyListeners();
         },

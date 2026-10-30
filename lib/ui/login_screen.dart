@@ -17,20 +17,16 @@ class LoginScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 3),
-              Text(
-                '할 일을 말하면\nAI가 끝내 드려요',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, height: 1.3, color: t.ink),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '서류 만들기, 엑셀 정리, 사진 속 글자 옮기기까지',
-                style: TextStyle(fontSize: 15, height: 1.5, color: t.muted),
-              ),
+              Text('AI AGENT', style: AppTokens.meta(t)),
+              const SizedBox(height: 20),
+              Text('할 일을 말하면\nAI가 끝내\n드려요.', style: AppTokens.heading(t, 44)),
+              const SizedBox(height: 16),
+              Text('서류 만들기, 엑셀 정리, 사진 속 글자 옮기기까지.', style: TextStyle(fontSize: 17, height: 1.6, color: t.muted)),
               const Spacer(flex: 4),
               if (google.busy)
                 const Center(child: CircularProgressIndicator())
