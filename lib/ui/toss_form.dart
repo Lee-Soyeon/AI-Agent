@@ -213,19 +213,19 @@ class TossBigButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool filled;
 
+  // Montage Button large: min-height 48, padding 13·20, body2 bold, radius 14.
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 60,
-    child: filled
-        ? FilledButton.icon(
-            onPressed: onPressed,
-            icon: Icon(icon, size: 22),
-            label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          )
-        : OutlinedButton.icon(
-            onPressed: onPressed,
-            icon: Icon(icon, size: 22),
-            label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          ),
-  );
+  Widget build(BuildContext context) {
+    final style = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 20, vertical: 13)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+      textStyle: WidgetStatePropertyAll(MontageType.body2(MontageType.bold).copyWith(height: 1, fontFamily: 'Wanted Sans')),
+    );
+    final label = Text(this.label);
+    final glyph = Icon(icon, size: 20);
+    return filled
+        ? FilledButton.icon(onPressed: onPressed, style: style, icon: glyph, label: label)
+        : OutlinedButton.icon(onPressed: onPressed, style: style, icon: glyph, label: label);
+  }
 }

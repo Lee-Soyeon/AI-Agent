@@ -139,9 +139,20 @@ class SettingsStore extends ChangeNotifier {
   }
 
   /// 시스템 프롬프트에 넣을 프로필 한 줄. 아무것도 없으면 null.
+  // server/app/tasks.json personas 와 같은 이름. 화면·프롬프트에 id(office 등)가 그대로 나가지 않게.
+  static const _personaLabels = {
+    'student': '학생',
+    'office': '직장인',
+    'parttime': '아르바이트',
+    'owner': '자영업',
+    'home': '은퇴·가정',
+    'jobseeker': '취업 준비',
+    'other': '기타',
+  };
+
   String? get profileSummary {
     final parts = [
-      if (persona.isNotEmpty) '하는 일: $persona',
+      if (persona.isNotEmpty) '하는 일: ${_personaLabels[persona] ?? persona}',
       if (routine.isNotEmpty) '반복하는 일: $routine',
       if (device.isNotEmpty) '주로 쓰는 기기: ${device == 'computer' ? '컴퓨터' : '폰'}',
     ];

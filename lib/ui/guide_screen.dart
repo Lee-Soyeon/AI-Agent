@@ -120,7 +120,11 @@ class _GuideScreenState extends State<GuideScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filled(icon: const Icon(Icons.arrow_forward), onPressed: () => _startOther(_other.text)),
+                IconButton.filled(
+                  style: IconButton.styleFrom(foregroundColor: t.accentInk, minimumSize: const Size(48, 48)),
+                  icon: const Icon(Icons.arrow_upward),
+                  onPressed: () => _startOther(_other.text),
+                ),
               ],
             ),
             const SizedBox(height: 24),

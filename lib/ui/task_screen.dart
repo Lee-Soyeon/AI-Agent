@@ -215,6 +215,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     ),
                     const SizedBox(width: 8),
                     IconButton.filled(
+                      style: IconButton.styleFrom(foregroundColor: AppTokens.of(context).accentInk),
                       icon: Icon(fresh ? Icons.play_arrow : Icons.send),
                       tooltip: fresh ? '실행' : '보내기',
                       onPressed: () => _send(agent),
@@ -469,6 +470,7 @@ class _QuestionCardState extends State<_QuestionCard> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
+                    style: IconButton.styleFrom(foregroundColor: AppTokens.of(context).accentInk),
                     icon: const Icon(Icons.send),
                     onPressed: () {
                       final t = _answer.text.trim();

@@ -157,9 +157,12 @@ abstract final class MontageType {
 
 ThemeData buildAppTheme(Brightness brightness) {
   final t = brightness == Brightness.dark ? AppTokens.dark : AppTokens.light;
-  final pillShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTokens.pill));
-  final buttonText = MontageType.body1(MontageType.semibold);
-  const buttonPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 12);
+  // Montage Button medium (@montage-ui/core button/style): min-height 40, padding 10·16, label1 bold, radius 12.
+  // 줄 높이(height)는 버튼 안에서 빼야 여백이 토큰대로 나온다.
+  final pillShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+  final buttonText = MontageType.label1(MontageType.bold).copyWith(height: 1, fontFamily: 'Wanted Sans');
+  const buttonPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 10);
+  const buttonMin = Size(40, 40);
 
   final scheme = ColorScheme(
     brightness: brightness,
@@ -193,6 +196,10 @@ ThemeData buildAppTheme(Brightness brightness) {
 
   final base = ThemeData(
     useMaterial3: true,
+    // 웹 데스크톱 기본(compact)은 버튼 여백을 줄여 버린다. 토큰대로 쓰려면 표준 고정.
+    visualDensity: VisualDensity.standard,
+    // 줄·접기 항목은 여백 없이 붙어 있어서 마우스 올림 칠이 글자에 딱 붙는다. 폰 기준 화면이라 끈다.
+    hoverColor: Colors.transparent,
     brightness: brightness,
     colorScheme: scheme,
     fontFamily: 'Wanted Sans',
@@ -240,6 +247,7 @@ ThemeData buildAppTheme(Brightness brightness) {
         disabledForegroundColor: t.muted,
         shape: pillShape,
         padding: buttonPadding,
+        minimumSize: buttonMin,
         textStyle: buttonText,
         elevation: 0,
       ),
@@ -250,6 +258,7 @@ ThemeData buildAppTheme(Brightness brightness) {
         foregroundColor: t.accent,
         shape: pillShape,
         padding: buttonPadding,
+        minimumSize: buttonMin,
         textStyle: buttonText,
         elevation: 0,
       ),
@@ -261,6 +270,7 @@ ThemeData buildAppTheme(Brightness brightness) {
         side: BorderSide(color: t.lineStrong),
         shape: pillShape,
         padding: buttonPadding,
+        minimumSize: buttonMin,
         textStyle: buttonText,
       ),
     ),
