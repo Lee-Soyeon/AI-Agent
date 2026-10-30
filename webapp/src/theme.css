@@ -1,0 +1,64 @@
+/* Montage 기본 색은 그대로, 브랜드 파랑만 중립 검정으로 (흰 배경 흑백).
+   값은 @montage-ui/core global.css 의 neutral 단계에서 가져왔다. */
+:root {
+  --semantic-foreground-brand-primary: #171719;
+  --semantic-foreground-brand-primary-rgb: 23, 23, 25;
+  --semantic-foreground-brand-inverse: #171719;
+  --semantic-foreground-brand-inverse-rgb: 23, 23, 25;
+  --semantic-surface-brand-primary: #171719;
+  --semantic-surface-brand-primary-rgb: 23, 23, 25;
+  --semantic-surface-brand-strong: #0f0f10;
+  --semantic-surface-brand-strong-rgb: 15, 15, 16;
+  --semantic-surface-brand-heavy: #000000;
+  --semantic-surface-brand-heavy-rgb: 0, 0, 0;
+  --semantic-surface-brand-subtle: #70737c14;
+  --semantic-surface-brand-subtle-rgb: 112, 115, 124;
+  --semantic-line-brand-primary: #70737c38;
+  --semantic-line-brand-primary-rgb: 112, 115, 124;
+  --semantic-line-brand-strong: #171719;
+  --semantic-line-brand-strong-rgb: 23, 23, 25;
+  --semantic-line-brand-focus: #70737c29;
+  --semantic-line-brand-focus-rgb: 112, 115, 124;
+}
+
+/* 폰 폭 한 컬럼. 넓은 화면에서는 가운데, 바깥은 background.neutral.secondary. */
+body {
+  background: var(--semantic-background-neutral-secondary);
+}
+.frame {
+  max-width: 430px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--semantic-background-neutral-primary);
+  display: flex;
+  flex-direction: column;
+}
+.page {
+  flex: 1;
+  padding: 24px 20px 120px;
+  display: flex;
+  flex-direction: column;
+}
+.bottom-bar {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: var(--semantic-background-neutral-primary);
+}
+.tabbar {
+  position: sticky;
+  bottom: 0;
+}
+.box {
+  background: var(--semantic-surface-neutral-secondary);
+  border-radius: 12px;
+  padding: 16px;
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+/* 한국어는 단어 중간에서 줄을 바꾸지 않는다 */
+body {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
