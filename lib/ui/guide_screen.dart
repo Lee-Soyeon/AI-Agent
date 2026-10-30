@@ -78,12 +78,10 @@ class _GuideScreenState extends State<GuideScreen> {
           padding: tabListPadding(context).copyWith(left: 24, right: 24, top: 32),
           children: [
             if (agent.isBusy) ...[ActiveTaskBanner(agent: agent), const SizedBox(height: 16)],
-            Text('AI AGENT', style: AppTokens.meta(t)),
-            const SizedBox(height: 20),
-            Text(name.isEmpty ? '무엇을\n맡길까요?' : '$name님,\n무엇을\n맡길까요?', style: AppTokens.heading(t, 44)),
-            const SizedBox(height: 16),
-            Text('가진 걸 넣으면 할 수 있는 일을 골라 드려요.', style: TextStyle(fontSize: 17, height: 1.6, color: t.muted)),
-            const SizedBox(height: 28),
+            Text(name.isEmpty ? '무엇을 맡길까요?' : '$name님,\n무엇을 맡길까요?', style: MontageType.title2().copyWith(color: t.ink)),
+            const SizedBox(height: 8),
+            Text('가진 걸 넣으면 할 수 있는 일을 골라 드려요', style: MontageType.body1Reading().copyWith(color: t.muted)),
+            const SizedBox(height: 24),
             Row(
               children: [
                 _InputTile(icon: Icons.photo_camera_outlined, label: '사진', onTap: () => _intake('photo')),
@@ -93,13 +91,10 @@ class _GuideScreenState extends State<GuideScreen> {
                 _InputTile(icon: Icons.notes, label: '글', onTap: () => _intake('text')),
               ],
             ),
-            const SizedBox(height: 64),
-            const _SectionLabel(index: 1, label: 'TASKS'),
-            const SizedBox(height: 16),
-            Text('이런 일을\n맡길 수 있어요', style: AppTokens.heading(t, 30)),
-            const SizedBox(height: 24),
-            Divider(height: 1, color: t.line),
-            for (final (i, r) in recipes.indexed) RecipeRow(recipe: r, index: i + 1, pick: r == today && settings.routine.isNotEmpty),
+            const SizedBox(height: 48),
+            Text('이런 일을 맡길 수 있어요', style: MontageType.heading1().copyWith(color: t.ink)),
+            const SizedBox(height: 8),
+            for (final r in recipes) RecipeRow(recipe: r, pick: r == today && settings.routine.isNotEmpty),
             if (others.isNotEmpty)
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -107,17 +102,13 @@ class _GuideScreenState extends State<GuideScreen> {
                   tilePadding: EdgeInsets.zero,
                   iconColor: t.muted,
                   collapsedIconColor: t.muted,
-                  title: Text('MORE', style: AppTokens.meta(t)),
-                  children: [
-                    for (final (i, r) in others.indexed) RecipeRow(recipe: r, index: recipes.length + i + 1),
-                  ],
+                  title: Text('다른 일 더 보기', style: MontageType.body2(MontageType.medium).copyWith(color: t.muted)),
+                  children: [for (final r in others) RecipeRow(recipe: r)],
                 ),
               ),
-            const SizedBox(height: 56),
-            const _SectionLabel(index: 2, label: 'ANYTHING ELSE'),
-            const SizedBox(height: 16),
-            Text('찾는 일이 없나요?', style: AppTokens.heading(t, 30)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 40),
+            Text('찾는 일이 없나요?', style: MontageType.heading1().copyWith(color: t.ink)),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -140,30 +131,7 @@ class _GuideScreenState extends State<GuideScreen> {
   }
 }
 
-/// Aidol SectionLabel: `(01) — LABEL`.
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.index, required this.label});
-
-  final int index;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppTokens.of(context);
-    final meta = AppTokens.meta(t);
-    return Row(
-      children: [
-        Text('(${'$index'.padLeft(2, '0')})', style: meta.copyWith(color: t.ink)),
-        const SizedBox(width: 12),
-        Container(width: 32, height: 1, color: t.lineStrong),
-        const SizedBox(width: 12),
-        Text(label, style: meta),
-      ],
-    );
-  }
-}
-
-/// Aidol SURFACE: 글자색 4% 채움 + 10% 테두리.
+/// 넣기 타일: Montage surface.neutral.secondary 면 + line.neutral.tertiary 선.
 class _InputTile extends StatelessWidget {
   const _InputTile({required this.icon, required this.label, required this.onTap});
 
@@ -192,7 +160,7 @@ class _InputTile extends StatelessWidget {
               children: [
                 Icon(icon, color: t.ink, size: 26),
                 const SizedBox(height: 10),
-                Text(label, style: TextStyle(color: t.ink, fontSize: 15, fontWeight: FontWeight.w700)),
+                Text(label, style: MontageType.body2(MontageType.semibold).copyWith(color: t.ink)),
               ],
             ),
           ),
@@ -300,33 +268,23 @@ class _SkeletonChips extends StatelessWidget {
   }
 }
 
-/// 할 일 한 줄: 번호 · 제목 · 무엇을 하는지 한 문장 · 화살표. 아래에 머리카락 선. 반복하는 일과 맞으면 PICK.
+/// 할 일 한 줄: 제목 · 무엇을 하는지 한 문장 · 화살표. 반복하는 일과 맞으면 "추천".
 class RecipeRow extends StatelessWidget {
-  const RecipeRow({super.key, required this.recipe, required this.index, this.pick = false});
+  const RecipeRow({super.key, required this.recipe, this.pick = false});
 
   final Recipe recipe;
-  final int index;
   final bool pick;
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    final meta = AppTokens.meta(t);
     return InkWell(
       onTap: () => startRecipe(context, recipe),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 36,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 3),
-                child: Text('$index'.padLeft(2, '0'), style: meta),
-              ),
-            ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,26 +296,31 @@ class RecipeRow extends StatelessWidget {
                           recipe.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: t.ink),
+                          style: MontageType.headline2().copyWith(color: t.ink),
                         ),
                       ),
                       if (pick) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: t.ink, borderRadius: BorderRadius.circular(4)),
-                          child: Text('PICK', style: meta.copyWith(color: t.bg, fontSize: 10, letterSpacing: 1.2)),
+                          decoration: BoxDecoration(color: t.tint, borderRadius: BorderRadius.circular(6)),
+                          child: Text('추천', style: MontageType.caption1(MontageType.semibold).copyWith(color: t.ink)),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(recipe.can, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.45, color: t.muted)),
+                  const SizedBox(height: 2),
+                  Text(
+                    recipe.can,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: MontageType.label1().copyWith(color: t.muted),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            Padding(padding: const EdgeInsets.only(top: 2), child: Icon(Icons.arrow_forward, size: 20, color: t.ink)),
+            Icon(Icons.chevron_right, size: 22, color: t.muted),
           ],
         ),
       ),

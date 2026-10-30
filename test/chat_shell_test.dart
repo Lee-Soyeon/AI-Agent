@@ -96,7 +96,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('가진 걸 넣으면 할 수 있는 일을 골라 드려요.'), findsOneWidget);
+    expect(find.text('가진 걸 넣으면 할 수 있는 일을 골라 드려요'), findsOneWidget);
     for (final t in AppTab.values) {
       expect(find.text(t.label), findsWidgets);
     }

@@ -76,18 +76,19 @@ flutter:
     - server/app/tasks.json
     - server/app/ui_schema.json
 
-  # Pretendard Std (KS X 1001 한글 2,350자판, OFL — assets/fonts/PRETENDARD-LICENSE.txt)
+  # Wanted Sans (원티드, OFL — assets/fonts/WANTED-SANS-OFL.txt). npm wanted-sans 1.0.3 을
+  # KS X 1001 한글 2,350자 + 라틴·기호로 줄였다(굵기당 약 380KB). 없는 글자는 시스템 폰트로.
   fonts:
-    - family: Pretendard
+    - family: Wanted Sans
       fonts:
-        - asset: assets/fonts/PretendardStd-Regular.otf
+        - asset: assets/fonts/WantedSans-Regular.otf
           weight: 400
-        - asset: assets/fonts/PretendardStd-SemiBold.otf
+        - asset: assets/fonts/WantedSans-Medium.otf
+          weight: 500
+        - asset: assets/fonts/WantedSans-SemiBold.otf
           weight: 600
-        - asset: assets/fonts/PretendardStd-Bold.otf
+        - asset: assets/fonts/WantedSans-Bold.otf
           weight: 700
-        - asset: assets/fonts/PretendardStd-Black.otf
-          weight: 900
 
   # To add assets to your application, add an assets section, like this:
   # assets:

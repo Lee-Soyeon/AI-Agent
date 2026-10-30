@@ -22,11 +22,9 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(flex: 3),
-              Text('AI AGENT', style: AppTokens.meta(t)),
-              const SizedBox(height: 20),
-              Text('할 일을 말하면\nAI가 끝내\n드려요.', style: AppTokens.heading(t, 44)),
-              const SizedBox(height: 16),
-              Text('서류 만들기, 엑셀 정리, 사진 속 글자 옮기기까지.', style: TextStyle(fontSize: 17, height: 1.6, color: t.muted)),
+              Text('할 일을 말하면\nAI가 끝내 드려요', style: MontageType.title1().copyWith(color: t.ink)),
+              const SizedBox(height: 12),
+              Text('서류 만들기, 엑셀 정리, 사진 속 글자 옮기기까지', style: MontageType.body1Reading().copyWith(color: t.muted)),
               const Spacer(flex: 4),
               if (google.busy)
                 const Center(child: CircularProgressIndicator())
@@ -36,13 +34,13 @@ class LoginScreen extends StatelessWidget {
                 Center(child: googleWebButton()),
               if (google.error != null) ...[
                 const SizedBox(height: 12),
-                Text(google.error!, textAlign: TextAlign.center, style: TextStyle(color: t.errorInk, fontSize: 12.5)),
+                Text(google.error!, textAlign: TextAlign.center, style: MontageType.label2().copyWith(color: t.errorInk)),
               ],
               const SizedBox(height: 16),
               Text(
                 '처음이면 가입, 이미 썼다면 로그인돼요.\n이름과 이메일만 받아요.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, height: 1.5, color: t.muted),
+                style: MontageType.label2().copyWith(color: t.muted),
               ),
             ],
           ),

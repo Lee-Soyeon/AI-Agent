@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// 디자인 토큰 — Aidol 디자인 시스템(booboobook/aidol buppy `frontend/src/styles/globals.css` daisyUI 테마,
-/// `components/landing/ui/styles.ts`)을 흑백으로 옮겼다.
+/// 디자인 토큰 — 원티드 Montage 디자인 시스템(npm @montage-ui/theme 4.1.5, montage.wanted.co.kr)을 흑백으로.
 ///
-/// - 바탕·글자·면: Aidol dark 테마 base-100 #000 / base-200 #1a1a1a / base-300 #2d2d2d / base-content #fff,
-///   light 테마 base-100 #fff / base-200 #f7f7f7 / base-300 #e4e4e4 / base-content #000.
-/// - 강조색(primary 핑크)은 쓰지 않고 base-content(흰/검)로 바꿨다. 강조는 주 버튼 하나에만.
-/// - 면은 SURFACE 규칙: 글자색 4% 채움 + 10% 테두리, 둥글기 24.
-/// 경고·에러만 예외로 activity-timeblock ToastProvider 배색을 남겼다.
+/// - 글자색: foreground.neutral primary #171719 · secondary #2E2F33 88% · tertiary #37383C 61% · quaternary 28%
+/// - 선: line.neutral #70737C 8%(tertiary) · 22%(primary). 면: surface.neutral.secondary #70737C 8%, background.secondary #F7F7F8
+/// - 브랜드 파랑 대신 primary 글자색(#171719)을 강조로 쓴다.
+/// - 글자 크기·줄 높이·자간·굵기는 [MontageType] (typography 토큰 그대로).
+/// 경고·에러만 activity-timeblock ToastProvider 배색을 남겼다.
 @immutable
 class AppTokens extends ThemeExtension<AppTokens> {
   const AppTokens({
@@ -47,14 +46,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const light = AppTokens(
     bg: Color(0xFFFFFFFF),
     paper: Color(0xFFFFFFFF),
-    tint: Color(0x0A000000), // base-content 4%
-    ink: Color(0xFF000000),
-    muted: Color(0xA6000000), // base-content 65% (LEAD)
-    line: Color(0x1A000000), // base-content 10%
-    lineStrong: Color(0x40000000), // base-content 25%
-    accent: Color(0xFF000000),
+    tint: Color(0x1470737C), // surface.neutral.secondary
+    ink: Color(0xFF171719), // foreground.neutral.primary
+    muted: Color(0x9C37383C), // foreground.neutral.tertiary
+    line: Color(0x1470737C), // line.neutral.tertiary
+    lineStrong: Color(0x3870737C), // line.neutral.primary
+    accent: Color(0xFF171719),
     accentInk: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFF7F7F7), // base-200
+    accentSoft: Color(0xFFF7F7F8), // background.neutral.secondary
     warningBg: Color(0xFFFFFBE6),
     warningInk: Color(0xFF744600),
     warningLine: Color(0xFFFAAD14),
@@ -80,23 +79,10 @@ class AppTokens extends ThemeExtension<AppTokens> {
     errorInk: Color(0xFFFF7875),
   );
 
-  // Aidol: SURFACE rounded-3xl(24) · 버튼 rounded-lg(8)
-  static const double r = 24;
-  static const double rSm = 14;
-  static const double pill = 8;
-
-  /// Aidol META: 번호·라벨 같은 ASCII 메타 텍스트 (대문자, 넓은 자간).
-  static TextStyle meta(AppTokens t) => TextStyle(
-    fontSize: 12,
-    letterSpacing: 1.9,
-    fontWeight: FontWeight.w600,
-    color: t.ink.withValues(alpha: 0.5),
-    fontFeatures: const [FontFeature.tabularFigures()],
-  );
-
-  /// Aidol HEADING: font-black, 좁은 자간, 촘촘한 줄 간격.
-  static TextStyle heading(AppTokens t, double size) =>
-      TextStyle(fontSize: size, fontWeight: FontWeight.w900, letterSpacing: -0.03 * size, height: 1.08, color: t.ink);
+  // Montage radius 토큰 중에서
+  static const double r = 16;
+  static const double rSm = 12;
+  static const double pill = 12;
 
   // globals.css: --shadow-lg (떠 있는 것에만)
   static const shadowLg = [
@@ -117,12 +103,63 @@ class AppTokens extends ThemeExtension<AppTokens> {
   AppTokens lerp(AppTokens? other, double t) => t < 0.5 || other == null ? this : other;
 }
 
+/// 원티드 Montage typography 토큰 (@montage-ui/theme 4.1.5 `theme/typography`).
+/// 크기·줄 높이는 rem(16px) 기준, 자간은 em. 굵기는 토큰의 regular/medium/bold 중에서.
+abstract final class MontageType {
+  static TextStyle _t(double size, double line, double em, FontWeight w) =>
+      TextStyle(fontSize: size, height: line / size, letterSpacing: em * size, fontWeight: w);
+
+  static const _r = FontWeight.w400, _m = FontWeight.w500, _s = FontWeight.w600, _b = FontWeight.w700;
+
+  static TextStyle display1([FontWeight w = _b]) => _t(56, 72, -0.0319, w);
+  static TextStyle display2([FontWeight w = _b]) => _t(40, 52, -0.0282, w);
+  static TextStyle display3([FontWeight w = _b]) => _t(36, 48, -0.027, w);
+  static TextStyle title1([FontWeight w = _b]) => _t(32, 44, -0.0253, w);
+  static TextStyle title2([FontWeight w = _b]) => _t(28, 38, -0.0236, w);
+  static TextStyle title3([FontWeight w = _b]) => _t(24, 32, -0.023, w);
+  static TextStyle heading1([FontWeight w = _s]) => _t(22, 30, -0.0194, w);
+  static TextStyle heading2([FontWeight w = _s]) => _t(20, 28, -0.012, w);
+  static TextStyle headline1([FontWeight w = _s]) => _t(18, 26, -0.002, w);
+  static TextStyle headline2([FontWeight w = _s]) => _t(17, 24, 0, w);
+  static TextStyle body1([FontWeight w = _r]) => _t(16, 24, 0.0057, w);
+  static TextStyle body1Reading([FontWeight w = _r]) => _t(16, 26, 0.0057, w);
+  static TextStyle body2([FontWeight w = _r]) => _t(15, 22, 0.0096, w);
+  static TextStyle body2Reading([FontWeight w = _r]) => _t(15, 24, 0.0096, w);
+  static TextStyle label1([FontWeight w = _r]) => _t(14, 20, 0.0145, w);
+  static TextStyle label1Reading([FontWeight w = _r]) => _t(14, 22, 0.0145, w);
+  static TextStyle label2([FontWeight w = _r]) => _t(13, 18, 0.0194, w);
+  static TextStyle caption1([FontWeight w = _r]) => _t(12, 16, 0.0252, w);
+  static TextStyle caption2([FontWeight w = _r]) => _t(11, 14, 0.0311, w);
+
+  static const medium = _m;
+  static const bold = _b;
+  static const semibold = _s;
+
+  /// Material TextTheme 자리에 Montage 단계를 꽂는다.
+  static TextTheme textTheme(Color ink, Color muted) => TextTheme(
+    displayLarge: display1(),
+    displayMedium: display2(),
+    displaySmall: display3(),
+    headlineLarge: title1(),
+    headlineMedium: title2(),
+    headlineSmall: title3(),
+    titleLarge: heading1(),
+    titleMedium: headline1(),
+    titleSmall: headline2(),
+    bodyLarge: body1(),
+    bodyMedium: body2(),
+    bodySmall: label1().copyWith(color: muted),
+    labelLarge: label1(_s),
+    labelMedium: label2(_m),
+    labelSmall: caption1(_m),
+  ).apply(bodyColor: ink, displayColor: ink, fontFamily: 'Wanted Sans');
+}
+
 ThemeData buildAppTheme(Brightness brightness) {
   final t = brightness == Brightness.dark ? AppTokens.dark : AppTokens.light;
   final pillShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTokens.pill));
-  // Aidol BUTTON_BASE: px-7 py-3.5 text-base font-bold
-  const buttonText = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
-  const buttonPadding = EdgeInsets.symmetric(horizontal: 28, vertical: 14);
+  final buttonText = MontageType.body1(MontageType.semibold);
+  const buttonPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 12);
 
   final scheme = ColorScheme(
     brightness: brightness,
@@ -158,35 +195,24 @@ ThemeData buildAppTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
-    fontFamily: 'Pretendard',
+    fontFamily: 'Wanted Sans',
   );
 
-  final text = base.textTheme.apply(bodyColor: t.ink, displayColor: t.ink);
+  final text = MontageType.textTheme(t.ink, t.muted);
 
   return base.copyWith(
     scaffoldBackgroundColor: t.bg,
     canvasColor: t.bg,
     dividerColor: t.line,
     extensions: [t],
-    textTheme: text.copyWith(
-      titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.6),
-      titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.3),
-      titleSmall: text.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-      bodySmall: text.bodySmall?.copyWith(color: t.muted),
-      labelLarge: text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-    ),
+    textTheme: text,
     appBarTheme: AppBarTheme(
       backgroundColor: t.bg,
       foregroundColor: t.ink,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
-        color: t.ink,
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.6,
-      ),
+      titleTextStyle: MontageType.heading2().copyWith(color: t.ink, fontFamily: 'Wanted Sans'),
     ),
     // 흰 바탕에 옅은 회색 면으로 구분 — 선·그림자 없음
     cardTheme: CardThemeData(
@@ -201,8 +227,8 @@ ThemeData buildAppTheme(Brightness brightness) {
     listTileTheme: ListTileThemeData(
       iconColor: t.muted,
       textColor: t.ink,
-      subtitleTextStyle: TextStyle(color: t.muted, fontSize: 13),
-      titleTextStyle: TextStyle(color: t.ink, fontSize: 15, fontWeight: FontWeight.w600),
+      subtitleTextStyle: MontageType.label1().copyWith(color: t.muted, fontFamily: 'Wanted Sans'),
+      titleTextStyle: MontageType.body1(MontageType.semibold).copyWith(color: t.ink, fontFamily: 'Wanted Sans'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTokens.r)),
     ),
     dividerTheme: DividerThemeData(color: t.line, thickness: 1, space: 1),
