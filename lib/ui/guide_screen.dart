@@ -92,7 +92,7 @@ class _GuideScreenState extends State<GuideScreen> {
               ],
             ),
             const SizedBox(height: 48),
-            Text('이런 일을 맡길 수 있어요', style: MontageType.heading1().copyWith(color: t.ink)),
+            Text('이런 일을 맡길 수 있어요', style: MontageType.heading1(MontageType.bold).copyWith(color: t.ink)),
             const SizedBox(height: 8),
             for (final r in recipes) RecipeRow(recipe: r, pick: r == today && settings.routine.isNotEmpty),
             if (others.isNotEmpty)
@@ -107,7 +107,7 @@ class _GuideScreenState extends State<GuideScreen> {
                 ),
               ),
             const SizedBox(height: 40),
-            Text('찾는 일이 없나요?', style: MontageType.heading1().copyWith(color: t.ink)),
+            Text('찾는 일이 없나요?', style: MontageType.heading1(MontageType.bold).copyWith(color: t.ink)),
             const SizedBox(height: 12),
             Row(
               children: [

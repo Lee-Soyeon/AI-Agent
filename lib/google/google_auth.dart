@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Google OAuth 클라이언트 ID 는 빌드 시 주입한다.
 ///
@@ -40,9 +41,31 @@ class GoogleAuthService extends ChangeNotifier {
   /// Gmail 권한까지 받았는지.
   bool gmailConnected = false;
 
-  bool get isSignedIn => user != null;
-  String? get email => user?.email;
-  String? get name => user?.displayName;
+  /// 마지막으로 로그인한 계정(이메일·이름). 웹 GIS 는 로그인을 기억하지 않고 One Tap 복원은
+  /// 돌아오지 않을 수 있어서, 로그아웃 전까지는 이 값으로 로그인 상태를 유지한다.
+  String? _savedEmail;
+  String? _savedName;
+  static const _kEmail = 'google_login_email', _kName = 'google_login_name';
+
+  bool get isSignedIn => user != null || _savedEmail != null;
+  String? get email => user?.email ?? _savedEmail;
+  String? get name => user?.displayName ?? _savedName;
+
+  GoogleSignInAuthorizationClient get _authz => user?.authorizationClient ?? _signIn.authorizationClient;
+
+  Future<void> _remember(GoogleSignInAccount? account) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (account == null) {
+      _savedEmail = _savedName = null;
+      await prefs.remove(_kEmail);
+      await prefs.remove(_kName);
+      return;
+    }
+    _savedEmail = account.email;
+    _savedName = account.displayName;
+    await prefs.setString(_kEmail, account.email);
+    if (account.displayName != null) await prefs.setString(_kName, account.displayName!);
+  }
 
   /// 이 빌드에 클라이언트 ID 가 들어 있으면 앱을 쓰기 전에 로그인을 받는다.
   /// 없으면(로컬 개발 등) 로그인 화면 없이 바로 쓴다.
@@ -56,6 +79,9 @@ class GoogleAuthService extends ChangeNotifier {
 
   Future<void> _doInit() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      _savedEmail = prefs.getString(_kEmail);
+      _savedName = prefs.getString(_kName);
       final clientId = kIsWeb ? _webClientId : _iosClientId;
       await _signIn.initialize(
         clientId: clientId.isEmpty ? null : clientId,
@@ -63,10 +89,13 @@ class GoogleAuthService extends ChangeNotifier {
       );
       _sub = _signIn.authenticationEvents.listen(
         (e) {
-          user = switch (e) {
+          final signedIn = switch (e) {
             GoogleSignInAuthenticationEventSignIn() => e.user,
             GoogleSignInAuthenticationEventSignOut() => null,
           };
+          // 웹에서 One Tap 세션이 끝나 SignOut 이벤트가 와도 앱 로그인은 유지한다 (로그아웃은 signOut 으로만).
+          if (signedIn != null) unawaited(_remember(signedIn));
+          user = signedIn;
           if (user == null) gmailConnected = false;
           notifyListeners();
           unawaited(_checkGmail());
@@ -78,8 +107,8 @@ class GoogleAuthService extends ChangeNotifier {
           notifyListeners();
         },
       );
-      // 이전에 로그인했다면 조용히 복원한다.
-      await _signIn.attemptLightweightAuthentication();
+      // 이전에 로그인했다면 조용히 복원한다. 웹은 One Tap 창을 띄우므로 저장된 계정이 있으면 하지 않는다.
+      if (!(kIsWeb && _savedEmail != null)) await _signIn.attemptLightweightAuthentication();
     } catch (e) {
       error = _describe(e);
     } finally {
@@ -90,10 +119,9 @@ class GoogleAuthService extends ChangeNotifier {
 
   /// 이미 받은 Gmail 권한이 있는지 창을 띄우지 않고 확인한다.
   Future<void> _checkGmail() async {
-    final u = user;
-    if (u == null) return;
+    if (!isSignedIn) return;
     try {
-      final ok = await u.authorizationClient.authorizationForScopes(gmailScopes) != null;
+      final ok = await _authz.authorizationForScopes(gmailScopes) != null;
       if (ok != gmailConnected) {
         gmailConnected = ok;
         notifyListeners();
@@ -110,6 +138,7 @@ class GoogleAuthService extends ChangeNotifier {
     try {
       await init();
       user = await _signIn.authenticate();
+      await _remember(user);
       return true;
     } on GoogleSignInException catch (e) {
       if (e.code != GoogleSignInExceptionCode.canceled) error = _describe(e);
@@ -130,16 +159,12 @@ class GoogleAuthService extends ChangeNotifier {
     notifyListeners();
     try {
       await init();
-      var account = user;
-      if (account == null) {
-        if (!canAuthenticate) {
-          error = '먼저 Google 계정으로 로그인해 주세요.';
-          return false;
-        }
-        account = await _signIn.authenticate(scopeHint: gmailScopes);
-        user = account;
+      if (user == null && canAuthenticate) {
+        user = await _signIn.authenticate(scopeHint: gmailScopes);
+        await _remember(user);
       }
-      await account.authorizationClient.authorizeScopes(gmailScopes);
+      // 웹은 계정 객체 없이도 권한 창을 띄울 수 있다.
+      await _authz.authorizeScopes(gmailScopes);
       gmailConnected = true;
       return true;
     } on GoogleSignInException catch (e) {
@@ -163,19 +188,20 @@ class GoogleAuthService extends ChangeNotifier {
     }
     user = null;
     gmailConnected = false;
+    await _remember(null);
     notifyListeners();
   }
 
   /// Gmail API 호출용 Authorization 헤더. [refresh] 면 캐시된 토큰을 버리고 새로 받는다.
   Future<Map<String, String>> authHeaders({bool refresh = false, String? staleToken}) async {
-    final u = user;
-    if (u == null) throw GoogleAuthRequired('Google 계정이 연결되어 있지 않습니다.');
+    if (!isSignedIn) throw GoogleAuthRequired('Google 계정이 연결되어 있지 않습니다.');
+    final u = _authz;
     if (refresh && staleToken != null) {
-      await u.authorizationClient.clearAuthorizationToken(accessToken: staleToken);
+      await u.clearAuthorizationToken(accessToken: staleToken);
     }
-    var headers = await u.authorizationClient.authorizationHeaders(gmailScopes);
+    var headers = await u.authorizationHeaders(gmailScopes);
     if (headers == null && !_signIn.authorizationRequiresUserInteraction()) {
-      headers = await u.authorizationClient.authorizationHeaders(
+      headers = await u.authorizationHeaders(
         gmailScopes,
         promptIfNecessary: true,
       );
