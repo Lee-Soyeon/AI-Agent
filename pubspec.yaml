@@ -76,6 +76,19 @@ flutter:
     - server/app/tasks.json
     - server/app/ui_schema.json
 
+  # Pretendard Std (KS X 1001 한글 2,350자판, OFL — assets/fonts/PRETENDARD-LICENSE.txt)
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/PretendardStd-Regular.otf
+          weight: 400
+        - asset: assets/fonts/PretendardStd-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/PretendardStd-Bold.otf
+          weight: 700
+        - asset: assets/fonts/PretendardStd-Black.otf
+          weight: 900
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

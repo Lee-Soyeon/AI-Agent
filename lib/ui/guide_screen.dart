@@ -72,71 +72,67 @@ class _GuideScreenState extends State<GuideScreen> {
     final name = (google.name ?? '').trim().split(RegExp(r'\s+')).first;
 
     return Scaffold(
-      backgroundColor: t.line,
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: tabListPadding(context).copyWith(top: 28),
+          padding: tabListPadding(context).copyWith(left: 24, right: 24, top: 32),
           children: [
-            if (agent.isBusy) ...[ActiveTaskBanner(agent: agent), const SizedBox(height: 12)],
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                name.isEmpty ? '무엇을 맡길까요?' : '$name님,\n무엇을 맡길까요?',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, height: 1.35, letterSpacing: -0.6, color: t.ink),
-              ),
-            ),
+            if (agent.isBusy) ...[ActiveTaskBanner(agent: agent), const SizedBox(height: 16)],
+            Text('AI AGENT', style: AppTokens.meta(t)),
             const SizedBox(height: 20),
-            _Section(
-              title: '가진 걸 넣어 주세요',
-              sub: '넣으면 그걸로 할 수 있는 일을 골라 드려요',
-              child: Row(
-                children: [
-                  _InputTile(icon: Icons.photo_camera_outlined, label: '사진', onTap: () => _intake('photo')),
-                  const SizedBox(width: 8),
-                  _InputTile(icon: Icons.insert_drive_file_outlined, label: '파일', onTap: () => _intake('file')),
-                  const SizedBox(width: 8),
-                  _InputTile(icon: Icons.notes, label: '글', onTap: () => _intake('text')),
-                ],
-              ),
+            Text(name.isEmpty ? '무엇을\n맡길까요?' : '$name님,\n무엇을\n맡길까요?', style: AppTokens.heading(t, 44)),
+            const SizedBox(height: 16),
+            Text('가진 걸 넣으면 할 수 있는 일을 골라 드려요.', style: TextStyle(fontSize: 17, height: 1.6, color: t.muted)),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                _InputTile(icon: Icons.photo_camera_outlined, label: '사진', onTap: () => _intake('photo')),
+                const SizedBox(width: 8),
+                _InputTile(icon: Icons.insert_drive_file_outlined, label: '파일', onTap: () => _intake('file')),
+                const SizedBox(width: 8),
+                _InputTile(icon: Icons.notes, label: '글', onTap: () => _intake('text')),
+              ],
             ),
-            const SizedBox(height: 12),
-            _Section(
-              title: '이런 일을 맡길 수 있어요',
-              padding: const EdgeInsets.fromLTRB(0, 20, 0, 8),
-              child: Column(
-                children: [
-                  for (final r in recipes) RecipeRow(recipe: r, pick: r == today && settings.routine.isNotEmpty),
-                  if (others.isNotEmpty)
-                    Theme(
-                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        tilePadding: const EdgeInsets.symmetric(horizontal: 20),
-                        title: Text('다른 일 더 보기', style: TextStyle(color: t.muted, fontSize: 15, fontWeight: FontWeight.w600)),
-                        children: [for (final r in others) RecipeRow(recipe: r)],
-                      ),
-                    ),
-                ],
+            const SizedBox(height: 64),
+            const _SectionLabel(index: 1, label: 'TASKS'),
+            const SizedBox(height: 16),
+            Text('이런 일을\n맡길 수 있어요', style: AppTokens.heading(t, 30)),
+            const SizedBox(height: 24),
+            Divider(height: 1, color: t.line),
+            for (final (i, r) in recipes.indexed) RecipeRow(recipe: r, index: i + 1, pick: r == today && settings.routine.isNotEmpty),
+            if (others.isNotEmpty)
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  iconColor: t.muted,
+                  collapsedIconColor: t.muted,
+                  title: Text('MORE', style: AppTokens.meta(t)),
+                  children: [
+                    for (final (i, r) in others.indexed) RecipeRow(recipe: r, index: recipes.length + i + 1),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _Section(
-              title: '찾는 일이 없나요?',
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TossKeywordField(
-                      controller: _other,
-                      autofocus: false,
-                      placeholder: '예: 영수증 사진 정리',
-                      onSubmitted: _startOther,
-                    ),
+            const SizedBox(height: 56),
+            const _SectionLabel(index: 2, label: 'ANYTHING ELSE'),
+            const SizedBox(height: 16),
+            Text('찾는 일이 없나요?', style: AppTokens.heading(t, 30)),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: TossKeywordField(
+                    controller: _other,
+                    autofocus: false,
+                    placeholder: '예: 영수증 사진 정리',
+                    onSubmitted: _startOther,
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(icon: const Icon(Icons.arrow_forward), onPressed: () => _startOther(_other.text)),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(icon: const Icon(Icons.arrow_forward), onPressed: () => _startOther(_other.text)),
+              ],
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -144,45 +140,30 @@ class _GuideScreenState extends State<GuideScreen> {
   }
 }
 
-/// 토스 홈의 흰 묶음: 회색 바탕 위 둥근 흰 면, 테두리 없음.
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child, this.sub, this.padding = const EdgeInsets.all(20)});
+/// Aidol SectionLabel: `(01) — LABEL`.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.index, required this.label});
 
-  final String title;
-  final String? sub;
-  final Widget child;
-  final EdgeInsets padding;
+  final int index;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
-    return Container(
-      decoration: BoxDecoration(color: t.paper, borderRadius: BorderRadius.circular(AppTokens.r)),
-      padding: padding,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: padding.left == 0 ? 20 : 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: t.ink)),
-                if (sub != null) ...[
-                  const SizedBox(height: 4),
-                  Text(sub!, style: TextStyle(fontSize: 14, color: t.muted)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
+    final meta = AppTokens.meta(t);
+    return Row(
+      children: [
+        Text('(${'$index'.padLeft(2, '0')})', style: meta.copyWith(color: t.ink)),
+        const SizedBox(width: 12),
+        Container(width: 32, height: 1, color: t.lineStrong),
+        const SizedBox(width: 12),
+        Text(label, style: meta),
+      ],
     );
   }
 }
 
+/// Aidol SURFACE: 글자색 4% 채움 + 10% 테두리.
 class _InputTile extends StatelessWidget {
   const _InputTile({required this.icon, required this.label, required this.onTap});
 
@@ -193,21 +174,25 @@ class _InputTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppTokens.rSm),
+      side: BorderSide(color: t.line),
+    );
     return Expanded(
       child: Material(
-        color: t.accentSoft,
-        borderRadius: BorderRadius.circular(AppTokens.rSm),
+        color: t.tint,
+        shape: shape,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppTokens.rSm),
+          customBorder: shape,
           onTap: onTap,
           child: SizedBox(
-            height: 88,
+            height: 96,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: t.accent, size: 28),
-                const SizedBox(height: 8),
-                Text(label, style: TextStyle(color: t.accent, fontSize: 15, fontWeight: FontWeight.w700)),
+                Icon(icon, color: t.ink, size: 26),
+                const SizedBox(height: 10),
+                Text(label, style: TextStyle(color: t.ink, fontSize: 15, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -315,42 +300,33 @@ class _SkeletonChips extends StatelessWidget {
   }
 }
 
-/// 할 일 한 줄: 동그란 아이콘 + 제목 + 무엇을 하는지 한 문장. 반복하는 일과 맞으면 "추천".
+/// 할 일 한 줄: 번호 · 제목 · 무엇을 하는지 한 문장 · 화살표. 아래에 머리카락 선. 반복하는 일과 맞으면 PICK.
 class RecipeRow extends StatelessWidget {
-  const RecipeRow({super.key, required this.recipe, this.pick = false});
+  const RecipeRow({super.key, required this.recipe, required this.index, this.pick = false});
 
   final Recipe recipe;
+  final int index;
   final bool pick;
-
-  static IconData iconFor(String id) => switch (id) {
-    _ when id.startsWith('doc_') => Icons.description_outlined,
-    _ when id.startsWith('excel') => Icons.table_chart_outlined,
-    _ when id.startsWith('photo') => Icons.photo_outlined,
-    _ when id.startsWith('bible') => Icons.menu_book_outlined,
-    _ when id.startsWith('notice') => Icons.campaign_outlined,
-    _ when id.startsWith('shift') => Icons.calendar_month_outlined,
-    _ when id.startsWith('resume') => Icons.edit_note,
-    _ when id.startsWith('job') => Icons.work_outline,
-    _ when id.startsWith('coupang') => Icons.shopping_bag_outlined,
-    _ => Icons.auto_awesome_outlined,
-  };
 
   @override
   Widget build(BuildContext context) {
     final t = AppTokens.of(context);
+    final meta = AppTokens.meta(t);
     return InkWell(
       onTap: () => startRecipe(context, recipe),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.line))),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(color: t.line, shape: BoxShape.circle),
-              child: Icon(iconFor(recipe.id), color: t.ink, size: 22),
+            SizedBox(
+              width: 36,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text('$index'.padLeft(2, '0'), style: meta),
+              ),
             ),
-            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,30 +338,26 @@ class RecipeRow extends StatelessWidget {
                           recipe.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: t.ink),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: t.ink),
                         ),
                       ),
                       if (pick) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: t.accentSoft, borderRadius: BorderRadius.circular(6)),
-                          child: Text('추천', style: TextStyle(color: t.accent, fontSize: 11, fontWeight: FontWeight.w700)),
+                          decoration: BoxDecoration(color: t.ink, borderRadius: BorderRadius.circular(4)),
+                          child: Text('PICK', style: meta.copyWith(color: t.bg, fontSize: 10, letterSpacing: 1.2)),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    recipe.can,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13.5, color: t.muted),
-                  ),
+                  const SizedBox(height: 4),
+                  Text(recipe.can, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, height: 1.45, color: t.muted)),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: t.muted.withValues(alpha: 0.6)),
+            const SizedBox(width: 12),
+            Padding(padding: const EdgeInsets.only(top: 2), child: Icon(Icons.arrow_forward, size: 20, color: t.ink)),
           ],
         ),
       ),

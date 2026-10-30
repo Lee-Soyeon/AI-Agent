@@ -73,6 +73,8 @@ class AiAgentApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
+      // Aidol 처럼 검은 바탕이 기본.
+      themeMode: ThemeMode.dark,
       // 모바일 웹 먼저 (PRD 7): 넓은 화면에서는 가운데 폰 폭 컬럼으로.
       builder: (context, child) => PhoneFrame(child: child ?? const SizedBox.shrink()),
       home: const MainShell(),
@@ -95,7 +97,7 @@ class PhoneFrame extends StatelessWidget {
     if (w <= threshold) return child;
     final t = AppTokens.of(context);
     return ColoredBox(
-      color: t.tint,
+      color: t.accentSoft,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: width),

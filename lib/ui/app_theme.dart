@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// 디자인 토큰 — algorima/activity-timeblock 의 기본(clean, 토스 스타일) 테마를 그대로 옮겼다.
+/// 디자인 토큰 — Aidol 디자인 시스템(booboobook/aidol buppy `frontend/src/styles/globals.css` daisyUI 테마,
+/// `components/landing/ui/styles.ts`)을 흑백으로 옮겼다.
 ///
-/// 출처: activity-timeblock `app/globals.css` 의 `:root` 와 다크 모드 블록.
-/// 경고·에러 배색은 같은 리포 `app/providers/ToastProvider.module.css` 의
-/// warning(#fffbe6/#744600, 테두리 #faad14)·error(#fce7e7/#d32f2f) 값.
-/// 새 색을 지어내지 말고, 필요하면 저쪽 토큰에서 가져올 것.
+/// - 바탕·글자·면: Aidol dark 테마 base-100 #000 / base-200 #1a1a1a / base-300 #2d2d2d / base-content #fff,
+///   light 테마 base-100 #fff / base-200 #f7f7f7 / base-300 #e4e4e4 / base-content #000.
+/// - 강조색(primary 핑크)은 쓰지 않고 base-content(흰/검)로 바꿨다. 강조는 주 버튼 하나에만.
+/// - 면은 SURFACE 규칙: 글자색 4% 채움 + 10% 테두리, 둥글기 24.
+/// 경고·에러만 예외로 activity-timeblock ToastProvider 배색을 남겼다.
 @immutable
 class AppTokens extends ThemeExtension<AppTokens> {
   const AppTokens({
@@ -45,14 +47,14 @@ class AppTokens extends ThemeExtension<AppTokens> {
   static const light = AppTokens(
     bg: Color(0xFFFFFFFF),
     paper: Color(0xFFFFFFFF),
-    tint: Color(0xFFF9FAFB),
-    ink: Color(0xFF191F28),
-    muted: Color(0xFF8B95A1),
-    line: Color(0xFFF2F4F6),
-    lineStrong: Color(0xFFE5E8EB),
-    accent: Color(0xFF3182F6),
+    tint: Color(0x0A000000), // base-content 4%
+    ink: Color(0xFF000000),
+    muted: Color(0xA6000000), // base-content 65% (LEAD)
+    line: Color(0x1A000000), // base-content 10%
+    lineStrong: Color(0x40000000), // base-content 25%
+    accent: Color(0xFF000000),
     accentInk: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFE8F3FF),
+    accentSoft: Color(0xFFF7F7F7), // base-200
     warningBg: Color(0xFFFFFBE6),
     warningInk: Color(0xFF744600),
     warningLine: Color(0xFFFAAD14),
@@ -61,16 +63,16 @@ class AppTokens extends ThemeExtension<AppTokens> {
   );
 
   static const dark = AppTokens(
-    bg: Color(0xFF0F1115),
-    paper: Color(0xFF17191F),
-    tint: Color(0xFF1B1E24),
-    ink: Color(0xFFE8EAED),
-    muted: Color(0xFF8B95A1),
-    line: Color(0xFF22252C),
-    lineStrong: Color(0xFF2B2F37),
-    accent: Color(0xFF4D94FF),
-    accentInk: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFF16283F),
+    bg: Color(0xFF000000),
+    paper: Color(0xFF000000),
+    tint: Color(0x0AFFFFFF),
+    ink: Color(0xFFFFFFFF),
+    muted: Color(0xA6FFFFFF),
+    line: Color(0x1AFFFFFF),
+    lineStrong: Color(0x40FFFFFF),
+    accent: Color(0xFFFFFFFF),
+    accentInk: Color(0xFF000000),
+    accentSoft: Color(0xFF1A1A1A), // base-200
     warningBg: Color(0xFF3A3106),
     warningInk: Color(0xFFFFC53D),
     warningLine: Color(0xFFFFC53D),
@@ -78,10 +80,23 @@ class AppTokens extends ThemeExtension<AppTokens> {
     errorInk: Color(0xFFFF7875),
   );
 
-  // globals.css: --r / --r-sm / --pill
-  static const double r = 20;
+  // Aidol: SURFACE rounded-3xl(24) · 버튼 rounded-lg(8)
+  static const double r = 24;
   static const double rSm = 14;
-  static const double pill = 12;
+  static const double pill = 8;
+
+  /// Aidol META: 번호·라벨 같은 ASCII 메타 텍스트 (대문자, 넓은 자간).
+  static TextStyle meta(AppTokens t) => TextStyle(
+    fontSize: 12,
+    letterSpacing: 1.9,
+    fontWeight: FontWeight.w600,
+    color: t.ink.withValues(alpha: 0.5),
+    fontFeatures: const [FontFeature.tabularFigures()],
+  );
+
+  /// Aidol HEADING: font-black, 좁은 자간, 촘촘한 줄 간격.
+  static TextStyle heading(AppTokens t, double size) =>
+      TextStyle(fontSize: size, fontWeight: FontWeight.w900, letterSpacing: -0.03 * size, height: 1.08, color: t.ink);
 
   // globals.css: --shadow-lg (떠 있는 것에만)
   static const shadowLg = [
@@ -105,8 +120,9 @@ class AppTokens extends ThemeExtension<AppTokens> {
 ThemeData buildAppTheme(Brightness brightness) {
   final t = brightness == Brightness.dark ? AppTokens.dark : AppTokens.light;
   final pillShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTokens.pill));
-  const buttonText = TextStyle(fontSize: 14, fontWeight: FontWeight.w700);
-  const buttonPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 11);
+  // Aidol BUTTON_BASE: px-7 py-3.5 text-base font-bold
+  const buttonText = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+  const buttonPadding = EdgeInsets.symmetric(horizontal: 28, vertical: 14);
 
   final scheme = ColorScheme(
     brightness: brightness,
@@ -142,8 +158,7 @@ ThemeData buildAppTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
-    // 폰트는 번들하지 않는다 — iOS 기본(SF + Apple SD Gothic Neo)은
-    // activity-timeblock 의 Pretendard 폴백 체인과 같다.
+    fontFamily: 'Pretendard',
   );
 
   final text = base.textTheme.apply(bodyColor: t.ink, displayColor: t.ink);
