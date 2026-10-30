@@ -96,7 +96,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('내 것부터 넣어 보세요'), findsOneWidget);
+    expect(find.text('가진 걸 넣어 주세요'), findsOneWidget);
     for (final t in AppTab.values) {
       expect(find.text(t.label), findsWidgets);
     }
